@@ -43,6 +43,7 @@ class App
 		game.load.image('civilian', 'data/tex/dog.png');
 		game.load.image('tiles', 'data/tex/tiles.png');
 		game.load.image('grass', 'data/tex/grass.jpg');
+		game.load.image('vision', 'data/tex/vision.jpg');
 		game.load.tilemap('level', 'data/level/level.json', null, Phaser.Tilemap.TILED_JSON);
 
 		game.load.start();
@@ -159,7 +160,8 @@ class App
 			//game.debug.body(player.sprite);
 		//guardGroup.forEachAlive(child => { if (child.body.enable) game.debug.body(child); }, null);
 		//civilianGroup.forEachAlive(child => { if (child.body.enable) game.debug.body(child); }, null);
-		game.debug.bodyInfo(player.sprite, 10, 20);
+		//game.debug.bodyInfo(player.sprite, 10, 20);
+		game.debug.bodyInfo(<Phaser.Sprite>guardGroup.children[1], 10, 20);
 	}
 
 	//------------------------------------------------------------------------------

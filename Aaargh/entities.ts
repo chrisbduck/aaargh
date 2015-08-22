@@ -24,6 +24,8 @@ interface INumDict
 	[key: string]: number;
 }
 
+var DIRECTIONS: Phaser.Point[] = [new Phaser.Point(1, 0), new Phaser.Point(0, 1), new Phaser.Point(-1, 0), new Phaser.Point(0, -1)];
+
 //------------------------------------------------------------------------------
 // Entity: base class.
 //------------------------------------------------------------------------------
@@ -37,11 +39,18 @@ class Entity
 	private saying: Phaser.Text;
 	private sayingEvent: Phaser.TimerEvent;
 	protected textStyle: IStrDict;
+	protected prevVel: Phaser.Point;
+	protected facingDir: Phaser.Point;
+	protected facingAngle: number;
+
+	protected isWatching: boolean;
+	private watchingSprite: Phaser.Sprite; 
 
 	private static debugCounters: INumDict = {};
+	protected static SCARED_QUOTES: string[] = ["Aaargh!", "Aargh!", "Aaaaaaargh!", "Help!", "Yikes!", "Urk!", "Waaaa!"];
 
 	//------------------------------------------------------------------------------
-	constructor(sprite: Phaser.Sprite, typeName: string)
+	constructor(sprite: Phaser.Sprite, typeName: string, watchingDistance: number = 0)
 	{
 		this.sprite = sprite;
 		this.body = sprite.body;
@@ -49,17 +58,27 @@ class Entity
 		this.saying = null;
 		this.sayingEvent = null;
 		this.textStyle = { font: "18px 'Comic Sans',cursive", align: "center", fill: "white" };
+		this.prevVel = new Phaser.Point();
+		this.setFacingDir(Utils.getRandomElementFrom(DIRECTIONS));
+		this.isWatching = false;
 
 		// Debug name
 		var count: number = Entity.debugCounters.hasOwnProperty(typeName) ? (Entity.debugCounters[typeName] + 1) : 1;
 		Entity.debugCounters[typeName] = count;
 		this.debugName = typeName + count;
+
+		if (watchingDistance > 0)
+			this.startWatching(watchingDistance);
 	}
 
 	//------------------------------------------------------------------------------
 	public update()
 	{
 		this.updateSayTextPosition();
+		this.updateVisionPosition();
+
+		var vel = this.sprite.body.velocity;
+		this.prevVel.setTo(vel.x, vel.y);
 	}
 
 	//------------------------------------------------------------------------------
@@ -86,6 +105,27 @@ class Entity
 	}
 
 	//------------------------------------------------------------------------------
+	public canSeePlayer(minSightAngleRatio: number, maxSightRangeSq: number): boolean
+	{
+		// Check distance first
+		var playerPos = player.sprite.position;
+		var thisPos = this.sprite.position;
+		var offsetToPlayer = new Phaser.Point(playerPos.x, playerPos.y).subtract(thisPos.x, thisPos.y);
+		var distSqToPlayer = offsetToPlayer.getMagnitudeSq();
+		//if (this.debugName == 'guard1')
+			//console.log("vision dist", distSqToPlayer, "dot", this.facingDir.dot(offsetToPlayer));
+		if (distSqToPlayer > maxSightRangeSq)
+			return false;
+
+		// Check angle
+		var facingRatio = this.facingDir.dot(offsetToPlayer);
+		if (facingRatio < minSightAngleRatio)
+			return false;
+
+		return true;
+	}
+
+	//------------------------------------------------------------------------------
 	private updateSayTextPosition()
 	{
 		if (!this.saying)
@@ -96,10 +136,28 @@ class Entity
 	}
 
 	//------------------------------------------------------------------------------
+	protected setFacingDir(vector: Phaser.Point)
+	{
+		if (vector.x === 0 && vector.y === 0)
+		{
+			this.facingDir = new Phaser.Point(1, 0);
+			this.facingAngle = 0;
+		}
+		else
+		{
+			this.facingDir = new Phaser.Point(vector.x, vector.y).normalize();
+			this.facingAngle = Phaser.Math.angleBetween(0, 0, this.facingDir.x, this.facingDir.y);
+		}
+		//if (this.debugName == 'guard1')
+			//console.log("guard1 facing", this.facingDir);
+	}
+
+	//------------------------------------------------------------------------------
 	protected moveTowardsPlayer(speed: number)
 	{
 		var angleToPlayer = this.sprite.position.angle(player.sprite.position);
 		this.body.velocity = Utils.getPointFromPolar(angleToPlayer, speed);
+		this.setFacingDir(this.body.velocity);
 		//var targetVel: Phaser.Point = Utils.getPointFromPolar(angleToPlayer, Guard.NORMAL_VEL);
 		//var velDiff: Phaser.Point = targetVel.subtract(this.body.velocity.x, this.body.velocity.y);
 		//this.body.acceleration.setTo(velDiff.x * Guard.ACCELERATION, velDiff.y * Guard.ACCELERATION);
@@ -108,10 +166,62 @@ class Entity
 	}
 
 	//------------------------------------------------------------------------------
+	protected faceTowardsPlayer()
+	{
+		var thisPos = this.sprite.position;
+		var playerPos = player.sprite.position;
+		var offsetToPlayer = new Phaser.Point(playerPos.x, playerPos.y).subtract(thisPos.x, thisPos.y);
+		this.setFacingDir(offsetToPlayer);
+	}
+
+	//------------------------------------------------------------------------------
 	protected moveAwayFromPlayer(speed: number)
 	{
 		var angleAwayFromPlayer = player.sprite.position.angle(this.sprite.position);
 		this.body.velocity = Utils.getPointFromPolar(angleAwayFromPlayer, speed);
+		this.setFacingDir(this.body.velocity);
+	}
+
+	//------------------------------------------------------------------------------
+	protected startWatching(watchingDistance: number)
+	{
+		if (this.isWatching)
+			return;
+		this.isWatching = true;
+		this.watchingSprite = game.add.sprite(0, 0, 'vision');
+		this.watchingSprite.alpha = 0.3;
+		this.watchingSprite.anchor.set(0.5, 1.0);
+		this.watchingSprite.blendMode = PIXI.blendModes.ADD;
+		var visionScale = watchingDistance / this.watchingSprite.height;
+		this.watchingSprite.scale.set(visionScale, visionScale);
+		this.updateVisionPosition();
+	}
+
+	//------------------------------------------------------------------------------
+	protected stopWatching()
+	{
+		if (!this.isWatching)
+			return;
+		this.isWatching = false;
+		this.watchingSprite.destroy();
+	}
+
+	//------------------------------------------------------------------------------
+	private updateVisionPosition()
+	{
+		if (!this.isWatching)
+			return;
+
+		var halfWidth = this.sprite.width * 0.5;
+		var halfHeight = this.sprite.height * 0.5;
+		var centreX = this.sprite.x + halfWidth;
+		var centreY = this.sprite.y + halfHeight;
+
+		var extraVisionSpacingFactor = 1.2;
+		this.watchingSprite.x = centreX;// + this.facingDir.x * halfWidth * extraVisionSpacingFactor;
+		this.watchingSprite.y = centreY;// + this.facingDir.y * halfHeight * extraVisionSpacingFactor;
+		var imageAngle = Math.PI * -0.5;
+		Utils.setSpriteRotation(this.watchingSprite, this.facingAngle, imageAngle);
 	}
 }
 
@@ -127,17 +237,23 @@ class Guard extends Entity
 	static ACCELERATION = 1800;
 	static DRAG = 1200;
 	static HIT_PAUSE_MS = 1000;
+	static ALERT_PAUSE_MS = 1000;
+	static MIN_SIGHT_ANGLE_RATIO = 0.5;		// max 60 degrees from straight on
+	static MAX_SIGHT_RANGE = 200;
+	static MAX_SIGHT_RANGE_SQ = Guard.MAX_SIGHT_RANGE * Guard.MAX_SIGHT_RANGE;
 
 	private movePaused: boolean;
+	private isChasing: boolean;
 
 	//------------------------------------------------------------------------------
 	constructor(sprite: Phaser.Sprite)
 	{
-		super(sprite, "guard");
+		super(sprite, "guard", Guard.MAX_SIGHT_RANGE);
 		this.body.maxVelocity.setTo(Guard.NORMAL_VEL, Guard.NORMAL_VEL);
 		this.body.drag.setTo(Guard.DRAG, Guard.DRAG);
 		this.movePaused = false;
-		this.textStyle['fill'] = Utils.getRandomStrFrom(["yellow", "orange", "indianred", "coral", "darkorange", "orangered"])
+		this.isChasing = false;
+		this.textStyle['fill'] = Utils.getRandomElementFrom(["yellow", "orange", "indianred", "coral", "darkorange", "orangered"])
 	}
 
 	//------------------------------------------------------------------------------
@@ -148,17 +264,31 @@ class Guard extends Entity
 		// Always collide with the player
 		var touchingPlayer = physics.collide(this.sprite, player.sprite);
 
-		if (!this.movePaused)
+		if (this.isChasing)
 		{
-			// If the guard is touching the player, hit the player, then pause them for a bit
-			if (touchingPlayer)
+			// Chase the player
+			if (!this.movePaused)
 			{
-				this.movePaused = true;
-				var unpauseEvent = game.time.events.add(Guard.HIT_PAUSE_MS, () => this.movePaused = false);
-				this.say(Utils.getRandomStrFrom(["<biff>", "<boff>", "<thump>", "<thock>", "<whump>"]));
+				// If the guard is touching the player, hit the player, then pause them for a bit
+				if (touchingPlayer)
+				{
+					this.movePaused = true;
+					game.time.events.add(Guard.HIT_PAUSE_MS, () => this.movePaused = false);
+					this.say(Utils.getRandomElementFrom(["<biff>", "<boff>", "<thump>", "<thock>", "<whump>"]));
+				}
+				else
+					this.moveTowardsPlayer(Guard.NORMAL_VEL);
 			}
 			else
-				this.moveTowardsPlayer(Guard.NORMAL_VEL);
+				this.faceTowardsPlayer();
+		}
+		// Look for the player
+		else if (this.canSeePlayer(Guard.MIN_SIGHT_ANGLE_RATIO, Guard.MAX_SIGHT_RANGE_SQ))
+		{
+			this.say(Utils.getRandomElementFrom(["Villain!", "Monster!", "Ahoy!", "Who are you?!", "Stop, creature!", "Stay where you are!"]));
+			this.isChasing = true;
+			this.movePaused = true;
+			game.time.events.add(Guard.ALERT_PAUSE_MS, () => this.movePaused = false);
 		}
 
 		super.update();
@@ -174,21 +304,27 @@ var civilianGroup: Phaser.Group;
 class Civilian extends Entity
 {
 	static DRAG = 600;
-	static FLEE_VEL = 220;
+	static FLEE_SPEED = 220;
 	static SCARE_THRESHOLD_MSQ = 100 * 100;
+	static MAX_SIGHT_RANGE = 120;
+	static MIN_SIGHT_ANGLE_RATIO = 0.7071;		// max 45 degrees from straight on
+	static MAX_SIGHT_RANGE_SQ = Civilian.MAX_SIGHT_RANGE * Civilian.MAX_SIGHT_RANGE;
+	static NORMAL_SPEED = 110;
 
 	private isFleeing: boolean;
+	private walkSpeed: number;
 
 	//------------------------------------------------------------------------------
 	constructor(sprite: Phaser.Sprite)
 	{
-		super(sprite, "civilian");
+		super(sprite, "civilian", Civilian.MAX_SIGHT_RANGE);
 		this.body.drag.setTo(Civilian.DRAG, Civilian.DRAG);
 		this.sprite.checkWorldBounds = true;
 		this.sprite.events.onOutOfBounds.add(() => this.handleEscaped());
 		this.isFleeing = false;
-		this.textStyle['fill'] = Utils.getRandomStrFrom(["aqua", "aquamarine", "cadetblue", "cyan", "darkgoldenrod",
-			"goldenrod", "midnightblue", "lightskyblue", "rebeccapurple"]);
+		this.walkSpeed = Civilian.NORMAL_SPEED;
+		this.textStyle['fill'] = Utils.getRandomElementFrom(["aqua", "aquamarine", "cadetblue", "cyan", "darkgoldenrod", "goldenrod", "lightskyblue"]);
+		//console.log(this.debugName, this.textStyle['fill']);
 
 	}
 
@@ -202,7 +338,13 @@ class Civilian extends Entity
 		game.physics.arcade.collide(this.sprite, player.sprite);
 
 		if (this.isFleeing)
-			this.moveAwayFromPlayer(Civilian.FLEE_VEL);
+			this.moveAwayFromPlayer(this.walkSpeed);
+		else if (this.canSeePlayer(Civilian.MIN_SIGHT_ANGLE_RATIO, Civilian.MAX_SIGHT_RANGE_SQ))
+		{
+			this.say(Utils.getRandomElementFrom(["Uh-oh...", "Hmmm...", "What's that?", "Strange..."]));
+			this.isFleeing = true;
+			this.walkSpeed = Civilian.NORMAL_SPEED;
+		}
 
 		super.update();
 	}
@@ -215,11 +357,17 @@ class Civilian extends Entity
 			offset.multiply(loudness, loudness);
 		var magnitudeSq = offset.getMagnitudeSq();
 		if (magnitudeSq < Civilian.SCARE_THRESHOLD_MSQ)
-			game.time.events.add(200, () =>
-			{
-				this.isFleeing = true;
-				this.say(Utils.getRandomStrFrom(["Aaargh!", "Aargh!", "Aaaaaaargh!", "Help!", "Yikes!", "Urk!", "Waaaa!"]));
-			});
+		{
+			this.walkSpeed = Civilian.FLEE_SPEED;
+			this.stopWatching();
+
+			if (!this.isFleeing)
+				game.time.events.add(200, () =>
+				{
+					this.isFleeing = true;
+					this.say(Utils.getRandomElementFrom(Entity.SCARED_QUOTES));
+				});
+		}
 	}
 
 	//------------------------------------------------------------------------------

@@ -13,7 +13,6 @@ class Player extends Entity
 	static ACCELERATION = 2000;
 	static DRAG = 1000;
 
-	private prevVel: Phaser.Point;
 	private canMove: boolean;
 	private cursorKeys: Phaser.CursorKeys;
 
@@ -39,9 +38,6 @@ class Player extends Entity
 	//------------------------------------------------------------------------------
 	public update()
 	{
-		var vel = this.sprite.body.velocity;
-		this.prevVel.setTo(vel.x, vel.y);
-
 		this.updateMoveInput();
 		this.updateSpecialInput();
 
@@ -115,7 +111,7 @@ class Player extends Entity
 		var lastKey = game.input.keyboard.lastKey;
 		if (lastKey && lastKey.justDown && lastKey.keyCode === Phaser.Keyboard.SPACEBAR)
 		{
-			this.say(Utils.getRandomStrFrom(["Boo!", "Raaa!", "Raaaarh!", "Grrr!", "Bwaha!"]));
+			this.say(Utils.getRandomElementFrom(["Boo!", "Raaa!", "Raaaarh!", "Grrr!", "Bwaha!", "Boogabooga!"]));
 			civilianGroup.forEachAlive(civilianSprite => civilianSprite.entity.handleNoise(this.sprite.position), null);
 		}
 	}

@@ -78,7 +78,7 @@ class Utils
 	}
 
 	//------------------------------------------------------------------------------
-	public static getRandomStrFrom(source: string[])
+	public static getRandomElementFrom(source: any[])
 	{
 		if (source.length === 0)
 			return source[0];
@@ -90,5 +90,11 @@ class Utils
 		} while (rand === 1);
 		var index: number = Math.floor(Math.random() * source.length);
 		return source[index];
+	}
+
+	//------------------------------------------------------------------------------
+	public static setSpriteRotation(sprite: Phaser.Sprite, targetAngle: number, imageAngle: number)
+	{
+		sprite.rotation = targetAngle - imageAngle;
 	}
 }
