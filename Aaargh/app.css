@@ -1,6 +1,6 @@
 ﻿body {
     font-family: 'Verdana', 'Segoe UI', sans-serif;
-	background-color: black;
+	background-color: #202020;
 	color: yellow;
 }
 
@@ -8,7 +8,25 @@ span {
     font-style: italic;
 }
 
+p {
+	text-align: center;
+}
+
+#statsCol {
+	width: 256px;
+	height: 640px;
+	float: left;
+}
+
+#contentCol {
+	float: left;
+}
+
 #content {
+}
+
+#pStatus {
+	padding-top: 2em;
 }
 
 canvas {
@@ -16,6 +34,5 @@ canvas {
 }
 
 h1 {
-	margin: 0;
 	text-align: center;
 }

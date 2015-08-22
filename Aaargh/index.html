@@ -15,15 +15,21 @@
 	  ga('send', 'pageview');
 	</script>
 	<script src="phaser/phaser.js"></script>
+	<script src="utils.js"></script>
+	<script src="entities.js"></script>
 	<script src="level.js"></script>
 	<script src="player.js"></script>
     <script src="app.js"></script>
 </head>
 <body>
-    <h1>Aaargh!</h1>
-
-	<i id="LoadStatus">Waiting for page...</i>
-
-    <div id="content"></div>
+	<aside id="statsCol">
+		<!-- Title, stats, etc -->
+		<h1>Aaargh!</h1>
+		<p id="pStatus"><i id="Status">Waiting for page...</i></p>
+	</aside>
+	<article id="contentCol">
+		<!-- Game -->
+		<div id="content"></div>
+	</article>
 </body>
 </html>

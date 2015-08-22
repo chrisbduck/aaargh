@@ -52,7 +52,7 @@ class Utils
 	// Other bits and pieces
 	//------------------------------------------------------------------------------
 
-	private addCentredText(y: number, str: string, color?: string): Phaser.Text
+	public static addCentredText(y: number, str: string, color?: string): Phaser.Text
 	{
 		var text = game.add.text(0, y, str, { font: "24px Verdana,Helvetica,sans-serif" });
 		var left = (game.width - text.width) * 0.5;
@@ -64,11 +64,31 @@ class Utils
 	}
 
 	//------------------------------------------------------------------------------
-
-	private changeCentredText(text: Phaser.Text, newStr: string)
+	public static changeCentredText(text: Phaser.Text, newStr: string)
 	{
 		text.text = newStr;
 		text.position.x = (game.width - text.width) * 0.5;
 	}
 
+	//------------------------------------------------------------------------------
+	public static getPointFromPolar(angle: number, magnitude: number): Phaser.Point
+	{
+		var point = new Phaser.Point(magnitude, 0);
+		return Phaser.Point.rotate(point, 0, 0, angle);
+	}
+
+	//------------------------------------------------------------------------------
+	public static getRandomStrFrom(source: string[])
+	{
+		if (source.length === 0)
+			return source[0];
+
+		var rand: number;
+		do
+		{
+			rand = Math.random();
+		} while (rand === 1);
+		var index: number = Math.floor(Math.random() * source.length);
+		return source[index];
+	}
 }
