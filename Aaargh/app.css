@@ -1,0 +1,16 @@
+﻿body {
+    font-family: 'Segoe UI', sans-serif;
+	background-color: black;
+	color: yellow;
+}
+
+span {
+    font-style: italic;
+}
+
+#content {
+}
+
+canvas {
+	margin: auto;
+}

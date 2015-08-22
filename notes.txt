@@ -1,0 +1,37 @@
+You are the Monster
+-------------------
+
+- Monster sneaking around and hiding from people
+	- Sneaks up to hug them
+	- Win by converting a number of people
+	- Throw bunches of flowers
+
+- Car racing
+	- Driving through gardens / houses
+	- Crashing for maximum impact?
+
+- Dragon flying
+	- Breathe fire on houses
+	- Steal gold, etc
+
+- Mario platformer, playing Boo the ghost
+
+- Non-platformer, flying a ghost around a house level and scaring people
+	- Monsters Inc theme
+	- Stealth with Mark of the Ninja elements
+	- Jump out and scare people
+		- Hide behind doors
+		- Behind plants or scenery
+		- Tap on shoulder from behind
+		- Shout "boo" with timing
+
+- Top-down shooter-y thing
+	- Shoot enemies - bit boring
+
+- Combine monster sneaking around hugging and scaring?
+	- Scares
+		- Run away; off screen = 
+	- Hugs / Friends
+	- Top-down vs platformer?
+		- Top-down = running around in any direction
+		- Platformer = left/right & jumping - needs ceiling walk or lots of hiding
