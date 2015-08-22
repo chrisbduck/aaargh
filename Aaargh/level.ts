@@ -55,4 +55,12 @@ class Level
 	{
 		game.physics.arcade.collide(player.sprite, this.layer);
 	}
+
+	//------------------------------------------------------------------------------
+	public destroy()
+	{
+		this.layer.destroy();
+		this.grass.destroy();
+		this.tilemap.destroy();
+	}
 }

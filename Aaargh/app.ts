@@ -7,13 +7,19 @@
 // <reference path='utils.ts'/>
 //------------------------------------------------------------------------------
 
+var app: App = null;
 var game: Phaser.Game = null;
-var statusText: HTMLElement = null;
+var statusText: HTMLSpanElement = null;
+var scareText: HTMLSpanElement = null;
+var friendText: HTMLSpanElement = null;
+var healthText: HTMLSpanElement = null;
+var subheaderText: HTMLSpanElement = null;
 var level: Level = null;
 
 var TILE_SIZE: number = 32;
 var NUM_TILES_X: number = 32;
 var NUM_TILES_Y: number = 20;
+var INITIAL_HEALTH: number = 5;
 
 //------------------------------------------------------------------------------
 // Main app
@@ -21,13 +27,24 @@ var NUM_TILES_Y: number = 20;
 class App
 {
 	public isRunning: boolean = false;
+	public isPaused: boolean = false;
+	private isAwaitingRestart: boolean = false;
 	private pauseText: Phaser.Text = null;
+	private scarePoints: number;
+	private friendPoints: number;
+	private healthPoints: number;
 
 	//------------------------------------------------------------------------------
     constructor()
 	{
         game = new Phaser.Game(NUM_TILES_X * TILE_SIZE, NUM_TILES_Y * TILE_SIZE, Phaser.AUTO, 'content',
 			{ preload: () => this.preload(), create: () => this.create(), update: () => this.update(), render: () => this.render() });
+
+		statusText = document.getElementById("status");
+		scareText = document.getElementById("scares");
+		friendText = document.getElementById("friends");
+		healthText = document.getElementById("health");
+		subheaderText = document.getElementById("subheader");
     }
 
 	//------------------------------------------------------------------------------
@@ -38,12 +55,15 @@ class App
 	//------------------------------------------------------------------------------
 	public startLoad(): void
 	{
+		this.numLoadedFiles = 0;
 		game.load.image('thief', 'data/tex/thief.png');
 		game.load.image('guard', 'data/tex/guard.png');
 		game.load.image('civilian', 'data/tex/dog.png');
 		game.load.image('tiles', 'data/tex/tiles.png');
 		game.load.image('grass', 'data/tex/grass.jpg');
 		game.load.image('vision', 'data/tex/vision.jpg');
+		game.load.image('scare', 'data/tex/pebble.png');
+		game.load.image('friend', 'data/tex/drop.png');
 		game.load.tilemap('level', 'data/level/level.json', null, Phaser.Tilemap.TILED_JSON);
 
 		game.load.start();
@@ -53,17 +73,17 @@ class App
     public create()
 	{
 		// Stop various key presses from passing through to the browser
-		var keyboard = Phaser.Keyboard;
-		game.input.keyboard.addKeyCapture([keyboard.LEFT, keyboard.RIGHT, keyboard.UP, keyboard.DOWN, keyboard.SPACEBAR, keyboard.BACKSPACE, keyboard.K]);
+		var kb = Phaser.Keyboard;
+		game.input.keyboard.addKeyCapture([kb.LEFT, kb.RIGHT, kb.UP, kb.DOWN, kb.SPACEBAR, kb.ENTER, kb.BACKSPACE, kb.P]);
 
 		game.physics.startSystem(Phaser.Physics.ARCADE);
 
 		game.load.onLoadStart.add(() => this.loadStart());
-		game.load.onFileComplete.add(() => this.fileComplete());
+		game.load.onFileComplete.add((progress) => this.fileComplete(progress));
 		game.load.onLoadComplete.add(() => this.loadComplete());
 		this.startLoad();
 
-		game.input.keyboard.onPressCallback = () => this.handleKeyPress();
+		//game.input.keyboard.onPressCallback = () => this.handleKeyPress();
 
 		game.time.advancedTiming = true;
     }
@@ -71,19 +91,20 @@ class App
 	//------------------------------------------------------------------------------
 	private loadStart()
 	{
-		this.setStatus("Loading");
+		this.setStatus("Loading... 0%");
 	}
 
 	//------------------------------------------------------------------------------
-	private fileComplete()
+	private fileComplete(progress: number)
 	{
-		statusText.innerHTML += ".";
+		this.setStatus("Loading... " + progress + "%");
 	}
 
 	//------------------------------------------------------------------------------
 	private loadComplete()
 	{
 		this.setStatus("");
+		document.getElementById("dScore").style.visibility = "visible";
 
 		console.log("Load complete");
 
@@ -97,26 +118,59 @@ class App
 
 		level = new Level('level', 'tiles');
 
+		this.setScarePoints(0);
+		this.setFriendPoints(0);
+		this.setHealthPoints(INITIAL_HEALTH);
 		this.isRunning = true;
+		this.isPaused = false;
+		this.isAwaitingRestart = false;
+	}
+
+	//------------------------------------------------------------------------------
+	private restartGame()
+	{
+		console.log("Game reset");
+
+		level.destroy();
+		guardGroup.destroy();
+		civilianGroup.destroy();
+		this.startGame();
 	}
 
 	//------------------------------------------------------------------------------
 	public update()
 	{
-		if (this.isRunning)
+		if (this.isRunning && !this.isPaused)
 			this.updateGame();
+
+		var lastKey = game.input.keyboard.lastKey;
+		if (lastKey && lastKey.justDown)
+			this.handleKeyPress();
 	}
 
 	//------------------------------------------------------------------------------
 	private handleKeyPress()		// only printable keys
 	{
-		Phaser.Keyboard.P;
+		var lastKey = game.input.keyboard.lastKey;
+		console.log("key press", lastKey);
 
-		if (game.input.keyboard.lastKey.keyCode === Phaser.Keyboard.P)
+		// Pause
+		if (this.isRunning && lastKey.keyCode === Phaser.Keyboard.P)
 		{
-			this.isRunning = !this.isRunning;
-			this.setStatus(this.isRunning ? "" : "Paused");
+			this.isPaused = !this.isPaused;
+			this.setStatus(this.isPaused ? "Paused" : "");
+			return;
 		}
+
+		// Restart
+		if (this.isAwaitingRestart && lastKey.keyCode === Phaser.Keyboard.ENTER)
+		{
+			this.restartGame();
+			return;
+		}
+
+		// Player input
+		player.checkForSpecialInput(lastKey);
 	}
 
 	//------------------------------------------------------------------------------
@@ -169,10 +223,60 @@ class App
 	{
 		statusText.innerHTML = text;
 	}
+
+	//------------------------------------------------------------------------------
+	public addScarePoints(num: number)
+	{
+		this.setScarePoints(this.scarePoints + num);
+	}
+
+	//------------------------------------------------------------------------------
+	private setScarePoints(num: number)
+	{
+		this.scarePoints = num;
+		scareText.innerHTML = num.toString();
+	}
+
+	//------------------------------------------------------------------------------
+	public addFriendPoints(num: number)
+	{
+		this.setFriendPoints(this.friendPoints + num);
+	}
+
+	//------------------------------------------------------------------------------
+	private setFriendPoints(num: number)
+	{
+		this.friendPoints = num;
+		friendText.innerHTML = num.toString();
+	}
+
+	//------------------------------------------------------------------------------
+	public subtractHealthPoints(num: number)
+	{
+		this.setHealthPoints(this.healthPoints - num);
+	}
+
+	//------------------------------------------------------------------------------
+	private setHealthPoints(num: number)
+	{
+		this.healthPoints = Math.max(num, 0);
+		var healthPct: number = num * 100 / INITIAL_HEALTH;
+		healthText.innerHTML = healthPct.toString() + "%";
+
+		var lowHealth: boolean = healthPct < 50;
+		healthText.style.color = lowHealth ? "red" : "orange";
+
+		if (this.healthPoints === 0)
+		{
+			this.isRunning = false;
+			this.isAwaitingRestart = true;
+			subheaderText.innerHTML = "Dead!";
+			this.setStatus("Press Enter to restart");
+		}
+	}
 }
 
 window.onload = () =>
 {
-	statusText = document.getElementById("Status");
-    var app = new App();
+    app = new App();
 };

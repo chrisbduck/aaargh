@@ -25,7 +25,27 @@
 	<aside id="statsCol">
 		<!-- Title, stats, etc -->
 		<h1>Aaargh!</h1>
-		<p id="pStatus"><i id="Status">Waiting for page...</i></p>
+		<div id="dScore">
+			<table>
+				<tr>
+					<td class="statName"><p>Scare points:</p></td>
+					<td class="statSpacer"></td>
+					<td class="statValue"><span id="scares">0</span></td>
+				</tr>
+				<tr>
+					<td class="statName"><p>Friend points:</p></td>
+					<td class="statSpacer"></td>
+					<td class="statValue"><span id="friends">0</span></td>
+				</tr>
+				<tr class="health">
+					<td class="statName"><p>Health:</p></td>
+					<td class="statSpacer"></td>
+					<td class="statValue"><span id="health">0</span></td>
+				</tr>
+			</table>
+		</div>
+		<h2><span id="subheader"></span></h2>
+		<p id="pStatus"><span id="status">Waiting for page...</span></p>
 	</aside>
 	<article id="contentCol">
 		<!-- Game -->

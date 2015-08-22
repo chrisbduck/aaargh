@@ -15,6 +15,7 @@ class Player extends Entity
 
 	private canMove: boolean;
 	private cursorKeys: Phaser.CursorKeys;
+	private health: number;
 
 	//------------------------------------------------------------------------------
 	constructor(sprite: Phaser.Sprite)
@@ -24,6 +25,7 @@ class Player extends Entity
 		this.prevVel = new Phaser.Point();
 		this.canMove = true;
 		this.textStyle['fill'] = "darkgray";
+		this.health = 5;
 
 		game.physics.arcade.enable(this.sprite);
 
@@ -39,7 +41,6 @@ class Player extends Entity
 	public update()
 	{
 		this.updateMoveInput();
-		this.updateSpecialInput();
 
 		super.update();
 	}
@@ -103,16 +104,23 @@ class Player extends Entity
 	}
 
 	//------------------------------------------------------------------------------
-	private updateSpecialInput()
+	public checkForSpecialInput(key: Phaser.Key)
 	{
 		if (!this.canMove)
 			return;
 
-		var lastKey = game.input.keyboard.lastKey;
-		if (lastKey && lastKey.justDown && lastKey.keyCode === Phaser.Keyboard.SPACEBAR)
+		if (key.keyCode === Phaser.Keyboard.SPACEBAR)
 		{
-			this.say(Utils.getRandomElementFrom(["Boo!", "Raaa!", "Raaaarh!", "Grrr!", "Bwaha!", "Boogabooga!"]));
-			civilianGroup.forEachAlive(civilianSprite => civilianSprite.entity.handleNoise(this.sprite.position), null);
+			this.say(Utils.getRandomElementFrom(["Boo!", "Raaa!", "Raaaar!", "Roooarrr!", "Grrr!", "Bwaha!", "Boogabooga!"]));
+			var noiseHandler = (entitySprite: IEntitySprite) => entitySprite.entity.handleNoise(this.sprite.position);
+			civilianGroup.forEachAlive(noiseHandler, null);
+			guardGroup.forEachAlive(noiseHandler, null);
 		}
+	}
+
+	//------------------------------------------------------------------------------
+	public hit(damage: number)
+	{
+		app.subtractHealthPoints(damage);
 	}
 }

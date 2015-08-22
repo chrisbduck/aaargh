@@ -36,6 +36,7 @@
     <TypeScriptCompile Include="app.ts" />
     <TypeScriptCompile Include="entities.ts" />
     <TypeScriptCompile Include="level.ts" />
+    <TypeScriptCompile Include="particles.ts" />
     <TypeScriptCompile Include="phaser\p2.d.ts" />
     <TypeScriptCompile Include="phaser\phaser.comments.d.ts" />
     <TypeScriptCompile Include="phaser\phaser.d.ts" />

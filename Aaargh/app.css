@@ -2,13 +2,6 @@
     font-family: 'Verdana', 'Segoe UI', sans-serif;
 	background-color: #202020;
 	color: yellow;
-}
-
-span {
-    font-style: italic;
-}
-
-p {
 	text-align: center;
 }
 
@@ -26,7 +19,20 @@ p {
 }
 
 #pStatus {
-	padding-top: 2em;
+	padding-top: 1.5em;
+}
+
+#status {
+    font-style: italic;
+}
+
+#dScore {
+	padding-top: 5em;
+	visibility: hidden;
+}
+
+.health {
+	color: orange;
 }
 
 canvas {
@@ -34,5 +40,32 @@ canvas {
 }
 
 h1 {
-	text-align: center;
+	font-size: 36px;
+}
+
+h2 {
+	padding-top: 3em;
+	font-size: 26px;
+	color: orangered;
+}
+
+table {
+	margin: auto;
+}
+
+tr {
+	margin: 0 0.5em 0 0.5em;
+}
+
+.statName {
+	text-align: right;
+}
+
+.statSpacer {
+	width: 16px;
+}
+
+.statValue {
+	text-align: left;
+	width: 48px;
 }
