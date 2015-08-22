@@ -11,7 +11,7 @@
     <DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>
     <TypeScriptToolsVersion>1.5</TypeScriptToolsVersion>
-	<TypeScriptCompileOnSaveEnabled>true</TypeScriptCompileOnSaveEnabled>
+    <TypeScriptCompileOnSaveEnabled>true</TypeScriptCompileOnSaveEnabled>
     <UseIISExpress>true</UseIISExpress>
     <IISExpressSSLPort />
     <IISExpressAnonymousAuthentication />
@@ -25,6 +25,7 @@
   <ItemGroup>
     <Content Include="app.css" />
     <Content Include="data\tex\run.png" />
+    <Content Include="data\tex\tiles.png" />
     <Content Include="index.html" />
     <Content Include="phaser\phaser.js" />
     <Content Include="phaser\phaser.min.js" />
@@ -32,14 +33,18 @@
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="app.ts" />
+    <TypeScriptCompile Include="level.ts" />
     <TypeScriptCompile Include="phaser\p2.d.ts" />
     <TypeScriptCompile Include="phaser\phaser.comments.d.ts" />
     <TypeScriptCompile Include="phaser\phaser.d.ts" />
     <TypeScriptCompile Include="phaser\pixi.comments.d.ts" />
     <TypeScriptCompile Include="phaser\pixi.d.ts" />
-    <TypeScriptCompile Include="Utils.ts" />
+    <TypeScriptCompile Include="player.ts" />
+    <TypeScriptCompile Include="utils.ts" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="assets\level\level.tmx" />
+    <Content Include="data\level\level.json" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>
@@ -74,6 +79,7 @@
           <SaveServerSettingsInUserFile>False</SaveServerSettingsInUserFile>
         </WebProjectProperties>
       </FlavorProperties>
+      <UserProperties data_4level_4level_1json__JSONSchema="http://json.schemastore.org/global" />
     </VisualStudio>
   </ProjectExtensions>
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">

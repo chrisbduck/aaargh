@@ -1,5 +1,5 @@
 ﻿body {
-    font-family: 'Segoe UI', sans-serif;
+    font-family: 'Verdana', 'Segoe UI', sans-serif;
 	background-color: black;
 	color: yellow;
 }
@@ -13,4 +13,9 @@ span {
 
 canvas {
 	margin: auto;
+}
+
+h1 {
+	margin: 0;
+	text-align: center;
 }
