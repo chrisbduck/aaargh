@@ -24,9 +24,23 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="app.css" />
-    <Content Include="data\tex\guard.png" />
-    <Content Include="data\tex\thief.png" />
+    <Content Include="data\tex\civilian-sheet.png" />
+    <Content Include="data\tex\civilian.png" />
+    <Content Include="data\tex\dog.png" />
+    <Content Include="data\tex\drop.png" />
+    <Content Include="data\tex\exclamation-white.png" />
+    <Content Include="data\tex\exclamation.png" />
+    <Content Include="data\tex\grass.jpg" />
+    <Content Include="data\tex\ground.jpg" />
+    <Content Include="data\tex\heart.png" />
+    <Content Include="data\tex\light-circle.png" />
+    <Content Include="data\tex\light-cone.png" />
+    <Content Include="data\tex\monster2-sheet.png" />
+    <Content Include="data\tex\plant.png" />
+    <Content Include="data\tex\policeman-sheet.png" />
+    <Content Include="data\tex\policeman.png" />
     <Content Include="data\tex\tiles.png" />
+    <Content Include="data\tex\wall.jpg" />
     <Content Include="index.html" />
     <Content Include="phaser\phaser.js" />
     <Content Include="phaser\phaser.min.js" />
@@ -49,6 +63,35 @@
   <ItemGroup>
     <Content Include="assets\level\level.tmx" />
     <Content Include="data\level\level.json" />
+    <Content Include="data\music\music.ogg" />
+    <Content Include="data\sfx\hit1.ogg" />
+    <Content Include="data\sfx\hit2.ogg" />
+    <Content Include="data\sfx\hit3.ogg" />
+    <Content Include="data\sfx\hit4.ogg" />
+    <Content Include="data\sfx\hugdone1.ogg" />
+    <Content Include="data\sfx\hugdone2.ogg" />
+    <Content Include="data\sfx\hugdone3.ogg" />
+    <Content Include="data\sfx\hugdone4.ogg" />
+    <Content Include="data\sfx\hugstart1.ogg" />
+    <Content Include="data\sfx\hugstart2.ogg" />
+    <Content Include="data\sfx\hugstart3.ogg" />
+    <Content Include="data\sfx\hugstart4.ogg" />
+    <Content Include="data\sfx\sawplayer1.ogg" />
+    <Content Include="data\sfx\sawplayer2.ogg" />
+    <Content Include="data\sfx\sawplayer3.ogg" />
+    <Content Include="data\sfx\sawplayer4.ogg" />
+    <Content Include="data\sfx\sawplayer5.ogg" />
+    <Content Include="data\sfx\scared1.ogg" />
+    <Content Include="data\sfx\scared2.ogg" />
+    <Content Include="data\sfx\scared3.ogg" />
+    <Content Include="data\sfx\scared4.ogg" />
+    <Content Include="data\sfx\scared5.ogg" />
+    <Content Include="data\sfx\scared6.ogg" />
+    <Content Include="data\sfx\scarenoise1.ogg" />
+    <Content Include="data\sfx\scarenoise2.ogg" />
+    <Content Include="data\sfx\scarenoise3.ogg" />
+    <Content Include="data\sfx\scarenoise4.ogg" />
+    <Content Include="data\sfx\scarenoise5.ogg" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>

@@ -111,6 +111,23 @@ class Utils
 	}
 
 	//------------------------------------------------------------------------------
+	public static randomInRange(min: number, max: number)
+	{
+		var val: number;
+		do
+		{
+			val = Math.random();
+		} while (val >= 1);
+		return min + val * (max - min);
+	}
+
+	//------------------------------------------------------------------------------
+	public static playSound(key: string, min: number, max: number)
+	{
+		game.add.audio(key + Math.round(Utils.randomInRange(min, max))).play();
+	}
+
+	//------------------------------------------------------------------------------
 	public static setSpriteRotation(sprite: Phaser.Sprite, targetAngle: number, imageAngle: number)
 	{
 		sprite.rotation = targetAngle - imageAngle;

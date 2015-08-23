@@ -39,6 +39,7 @@ class App
 	private hugHeld: boolean;
 	private hugHoldStart: number;
 	private chatterEvent: Phaser.TimerEvent;
+	private music: Phaser.Sound;
 
 	//------------------------------------------------------------------------------
     constructor()
@@ -67,10 +68,28 @@ class App
 		game.load.spritesheet('policeman', 'data/tex/policeman-sheet.png', 32, 32);
 
 		game.load.image('tiles', 'data/tex/tiles.png');
-		game.load.image('vision', 'data/tex/light-cone.jpg');
+		game.load.image('vision', 'data/tex/light-cone.png');
 		game.load.image('scare', 'data/tex/exclamation.png');
 		game.load.image('friend', 'data/tex/heart.png');
 		game.load.tilemap('level', 'data/level/level.json', null, Phaser.Tilemap.TILED_JSON);
+
+		var SOUND_EFFECTS = [
+			'hit1', 'hit2', 'hit3', 'hit4',
+			'hugdone1', 'hugdone2', 'hugdone3', 'hugdone4',
+			'hugstart1', 'hugstart2', 'hugstart3', 'hugstart4',
+			'sawplayer1', 'sawplayer2', 'sawplayer3', 'sawplayer4', 'sawplayer5', 
+			'scared1', 'scared2', 'scared3', 'scared4', 'scared5', 'scared6', 
+			'scarenoise1', 'scarenoise2', 'scarenoise3', 'scarenoise4', 'scarenoise5', 
+		];
+		for (var index = 0; index < SOUND_EFFECTS.length; ++index)
+		{
+			var key = SOUND_EFFECTS[index];
+			game.load.audio(key, 'data/sfx/' + key + '.ogg', true);
+		}
+
+		game.load.audio('broke-wall', 'data/sfx/hit1.ogg', true);
+
+		game.load.audio('music', 'data/music/music.ogg', true);
 
 		game.load.start();
 	}
@@ -93,6 +112,7 @@ class App
 
 		game.time.advancedTiming = true;
 		this.chatterEvent = null;
+		this.music = null;
     }
 
 	//------------------------------------------------------------------------------
@@ -135,6 +155,11 @@ class App
 		this.shouted = false;
 		this.hugHeld = false;
 		this.scheduleChatter();
+
+		if (this.music)
+			this.music.destroy();
+		this.music = game.add.audio('music', 0.6, true);
+		this.music.play();
 	}
 
 	//------------------------------------------------------------------------------
@@ -224,6 +249,9 @@ class App
 			this.restartGame();
 			return;
 		}
+
+		if (lastKey.keyCode === Phaser.Keyboard.M && this.music)
+			this.music.mute = !this.music.mute;
 	}
 
 	//------------------------------------------------------------------------------

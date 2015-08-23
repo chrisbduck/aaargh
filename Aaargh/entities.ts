@@ -302,6 +302,7 @@ class Entity
 		this.say(Utils.getRandomElementFrom(quotes));
 		new ScareEmitter(this.sprite.position.x, this.sprite.position.y, points * 4);
 		app.addScarePoints(points);
+		Utils.playSound('scared', 1, 6);
 	}
 
 	//------------------------------------------------------------------------------
@@ -339,6 +340,7 @@ class Entity
 		this.stopWatching();
 		this.sprite.alive = false;
 		new FriendEmitter(this.sprite.x, this.sprite.y, this.hugScore * 3);
+		Utils.playSound('hugdone', 1, 4);
 	}
 
 	//------------------------------------------------------------------------------
@@ -718,6 +720,7 @@ class Guard extends Entity
 			this.movePaused = true;
 			this.spottedPlayerTimer = null;
 			game.time.events.add(Guard.AFTER_SAW_PLAYER_PAUSE_MS, () => this.movePaused = false);
+			Utils.playSound('sawplayer', 1, 5);
 		});
 	}
 

@@ -158,6 +158,8 @@ class Player extends Entity
 		civilianGroup.forEachAlive(noiseHandler, null);
 		guardGroup.forEachAlive(noiseHandler, null);
 
+		Utils.playSound('scarenoise', 1, 5);
+
 		this.isShouting = true;
 		game.time.events.add(1000, () => this.isShouting = false);
 	}
@@ -166,6 +168,7 @@ class Player extends Entity
 	public receiveHit(damage: number)
 	{
 		app.subtractHealthPoints(damage);
+		Utils.playSound('hit', 1, 4);
 	}
 
 	//------------------------------------------------------------------------------
@@ -188,6 +191,7 @@ class Player extends Entity
 		civilianGroup.forEachAlive(hugHandler, null);
 		this.isHugging = true;
 		this.hugEmitter = new HugEmitter(this.sprite.position.x, this.sprite.position.y);
+		Utils.playSound('hugstart', 1, 4);
 	}
 
 	//------------------------------------------------------------------------------
