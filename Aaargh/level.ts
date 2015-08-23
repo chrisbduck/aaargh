@@ -14,7 +14,7 @@ var TILE_PATH = 2;
 class Level
 {
 	private tilemap: Phaser.Tilemap;
-	private layer: Phaser.TilemapLayer;
+	public layer: Phaser.TilemapLayer;
 	private grass: Phaser.TileSprite;
 
 	constructor(mapName: string, tilesetName: string)
@@ -56,7 +56,7 @@ class Level
 	{
 		var physics = game.physics.arcade;
 		physics.collide(player.sprite, this.layer);
-		physics.collide(guardGroup, this.layer);
+		//physics.collide(guardGroup, this.layer);
 		physics.collide(civilianGroup, this.layer);
 	}
 

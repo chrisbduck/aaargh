@@ -105,14 +105,6 @@ class Player extends Entity
 	}
 
 	//------------------------------------------------------------------------------
-	public checkForSpecialInput(key: Phaser.Key)
-	{
-		if (!this.canMove)
-			return;
-
-	}
-
-	//------------------------------------------------------------------------------
 	public prepareShout()
 	{
 		this.say("...", true);	// hold

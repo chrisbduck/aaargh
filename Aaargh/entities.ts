@@ -322,6 +322,8 @@ class Guard extends Entity
 	static ALERT_THRESHOLD_SQ = Guard.ALERT_THRESHOLD * Guard.ALERT_THRESHOLD;
 	static ALERT_PAUSE_MS = 800;
 	static LOST_PLAYER_GIVE_UP_MS = 4000;
+	static TOUCHING_STUCK_TIME_MS = 300;
+	static OVERRIDE_TARGET_TIME_MS = 300;
 
 	static STATE_STANDING = 0;
 	static STATE_CHASING = 1;
@@ -338,6 +340,10 @@ class Guard extends Entity
 	private timeLastSawPlayer: number;
 	private positionLastSawPlayer: Phaser.Point;
 	private lostPlayerReachedPoint: boolean;
+	private touchingStartPosition: Phaser.Point;
+	private touchingStartTime: number;
+	private overrideTarget: Phaser.Point;
+	private overrideTargetEndTime: number;
 
 	//------------------------------------------------------------------------------
 	constructor(sprite: Phaser.Sprite)
@@ -354,6 +360,9 @@ class Guard extends Entity
 		this.patrolRoute = null;
 		this.timeLastSawPlayer = 0;
 		this.positionLastSawPlayer = new Phaser.Point();
+		this.touchingStartPosition = new Phaser.Point();
+		this.touchingStartTime = 0;
+		this.overrideTarget = null;
 	}
 
 	//------------------------------------------------------------------------------
@@ -372,13 +381,22 @@ class Guard extends Entity
 		// Always collide with the player
 		var touchingPlayer = physics.collide(this.sprite, player.sprite);
 
-		var canSeePlayer = this.canSeePlayer(Guard.MIN_SIGHT_ANGLE_RATIO, Guard.MAX_SIGHT_RANGE_SQ);
+		var touchingLevel = physics.collide(this.sprite, level.layer);
+
+		// Give the guard a sight distance boost when they're chasing so they don't lose the player too easily
+		var maxSightRangeSq = Guard.MAX_SIGHT_RANGE_SQ;
+		if (this.state === Guard.STATE_CHASING)
+			maxSightRangeSq *= 2.25;	// 1.5^2
+
+		var canSeePlayer = this.canSeePlayer(Guard.MIN_SIGHT_ANGLE_RATIO, maxSightRangeSq);
 		if (canSeePlayer)
 		{
 			this.timeLastSawPlayer = game.time.now;
 			this.positionLastSawPlayer = player.sprite.position.clone();
 			this.lostPlayerReachedPoint = false;
 		}
+
+		var targetPoint: Phaser.Point = null;
 
 		switch (this.state)
 		{
@@ -405,7 +423,7 @@ class Guard extends Entity
 						else
 						{
 							// Move towards the player if we can see them, or the place we last saw them if not
-							var targetPoint: Phaser.Point = canSeePlayer ? player.sprite.position : this.positionLastSawPlayer;
+							targetPoint = canSeePlayer ? player.sprite.position : this.positionLastSawPlayer;
 							if (!canSeePlayer && this.hasReachedPoint(targetPoint))
 							{
 								// Can't see player, and got to the last place we saw them.  Just stay still for a bit until the player turns up or we give up above
@@ -432,9 +450,9 @@ class Guard extends Entity
 			case Guard.STATE_PATROLLING:
 				if (!this.movePaused)
 				{
-					var patrolPoint: Phaser.Point = this.patrolRoute[this.nextPatrolPointIndex];
-					this.moveTowardsPoint(patrolPoint, Guard.PATROL_SPEED, false);	// only change the facing dir when changing a patrol point
-					if (this.hasReachedPoint(patrolPoint))
+					targetPoint = this.patrolRoute[this.nextPatrolPointIndex];
+					this.moveTowardsPoint(targetPoint, Guard.PATROL_SPEED, false);	// only change the facing dir when changing a patrol point
+					if (this.hasReachedPoint(targetPoint))
 						this.patrolToPointIndex(this.nextPatrolPointIndex + 1);
 				}
 				// Fall through and look for the player.
@@ -456,6 +474,52 @@ class Guard extends Entity
 		}
 
 		super.update();
+
+		// Update stuck status
+		if (touchingLevel && !this.overrideTarget)
+		{
+			// Check if we just started touching something
+			if (this.touchingStartTime === 0)
+			{
+				console.log(this.debugName, "now touching level");
+				this.touchingStartPosition = this.sprite.position.clone();
+				this.touchingStartTime = game.time.now;
+			}
+			// Check if we've been touching things for too long and haven't gone anywhere
+			else if (game.time.now - this.touchingStartTime >= Guard.TOUCHING_STUCK_TIME_MS)
+			{
+				if (this.hasReachedPoint(this.touchingStartPosition))
+				{
+					console.log(this.debugName, "stuck on level");
+					// Stuck.  Pick a new target in a perpendicular direction for a moment
+					var offsetToTarget: Phaser.Point = Utils.offsetFromPoint1To2(this.sprite.position, targetPoint);
+					var perpOffset: Phaser.Point = (Math.random() < 0.5) ? offsetToTarget.perp() : offsetToTarget.rperp();
+					offsetToTarget.add(perpOffset.x, perpOffset.y);
+					this.overrideTarget = this.sprite.position.clone().add(offsetToTarget.x, offsetToTarget.y);
+					this.overrideTargetEndTime = game.time.now + Guard.OVERRIDE_TARGET_TIME_MS;
+				}
+				else
+				{
+					console.log(this.debugName, "unsticking temporarily");
+					this.touchingStartTime = 0;
+				}
+			}
+		}
+		else
+		{
+			if (this.touchingStartTime > 0)
+				console.log(this.debugName, "stopped touching level");
+			this.touchingStartTime = 0;
+		}
+		if (this.overrideTarget && this.overrideTargetEndTime <= game.time.now)
+			this.overrideTarget = null;
+	}
+
+	//------------------------------------------------------------------------------
+	protected moveTowardsPoint(point: Phaser.Point, speed: number, changeFacingDir: boolean = true)
+	{
+		var actualTarget = this.overrideTarget ? this.overrideTarget : point;
+		super.moveTowardsPoint(actualTarget, speed, changeFacingDir);
 	}
 
 	//------------------------------------------------------------------------------
@@ -532,9 +596,15 @@ class Civilian extends Entity
 	static MIN_SIGHT_ANGLE_RATIO = 0.866;		// max 30 degrees from straight on
 	static MAX_SIGHT_RANGE_SQ = Civilian.MAX_SIGHT_RANGE * Civilian.MAX_SIGHT_RANGE;
 	static NORMAL_SPEED = 110;
+	static WANDER_MIN_INTERVAL_MS = 1000;
+	static WANDER_MAX_INTERVAL_MS = 7000;
+	static WANDER_MIN_DIST = 24;
+	static WANDER_MAX_DIST = 80;
 
 	private isFleeing: boolean;
 	private walkSpeed: number;
+	private nextWander: Phaser.TimerEvent;
+	private target: Phaser.Point;
 
 	//------------------------------------------------------------------------------
 	constructor(sprite: Phaser.Sprite)
@@ -547,7 +617,8 @@ class Civilian extends Entity
 		this.walkSpeed = Civilian.NORMAL_SPEED;
 		this.textStyle['fill'] = Utils.getRandomElementFrom(["aqua", "aquamarine", "cadetblue", "cyan", "darkgoldenrod", "goldenrod", "lightskyblue"]);
 		//console.log(this.debugName, this.textStyle['fill']);
-
+		this.nextWander = null;
+		this.target = null;
 	}
 
 	//------------------------------------------------------------------------------
@@ -566,6 +637,27 @@ class Civilian extends Entity
 			this.isFleeing = true;
 			this.walkSpeed = Civilian.NORMAL_SPEED;
 			this.scare(2, ["Uh-oh...", "Hmmm...", "What's that?", "Who's that?", "Strange...", "I'm outta here..."]);
+		}
+		else if (this.target != null)
+		{
+			this.moveTowardsPoint(this.target, Civilian.NORMAL_SPEED);
+			if (this.hasReachedPoint(this.target))
+				this.target = null;
+		}
+		else if (this.nextWander == null)
+		{
+			var intervalMs = Phaser.Math.linear(Civilian.WANDER_MIN_INTERVAL_MS, Civilian.WANDER_MAX_INTERVAL_MS, Math.random());
+			this.nextWander = game.time.events.add(intervalMs, () =>
+			{
+				this.nextWander = null;
+				if (!this.isFleeing)
+				{
+					var angle = Phaser.Math.linear(-Math.PI, Math.PI, Math.random());
+					var speed = Phaser.Math.linear(Civilian.WANDER_MIN_DIST, Civilian.WANDER_MAX_DIST, Math.random());
+					var offset = Utils.getPointFromPolar(angle, speed);
+					this.target = this.sprite.position.clone().add(offset.x, offset.y);
+				}
+			});
 		}
 
 		super.update();

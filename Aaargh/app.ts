@@ -199,9 +199,6 @@ class App
 			this.restartGame();
 			return;
 		}
-
-		// Player input
-		player.checkForSpecialInput(lastKey);
 	}
 
 	//------------------------------------------------------------------------------
