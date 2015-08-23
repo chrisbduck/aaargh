@@ -130,7 +130,7 @@ class Player extends Entity
 	}
 
 	//------------------------------------------------------------------------------
-	public hit(damage: number)
+	public receiveHit(damage: number)
 	{
 		app.subtractHealthPoints(damage);
 	}

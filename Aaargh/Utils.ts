@@ -78,6 +78,24 @@ class Utils
 	}
 
 	//------------------------------------------------------------------------------
+	public static distBetweenPoints(point1: Phaser.Point, point2: Phaser.Point): number
+	{
+		return Phaser.Math.distance(point1.x, point1.y, point2.x, point2.y);
+	}
+
+	//------------------------------------------------------------------------------
+	public static distSqBetweenPoints(point1: Phaser.Point, point2: Phaser.Point): number
+	{
+		return Phaser.Math.distanceSq(point1.x, point1.y, point2.x, point2.y);
+	}
+
+	//------------------------------------------------------------------------------
+	public static offsetFromPoint1To2(point1: Phaser.Point, point2: Phaser.Point): Phaser.Point
+	{
+		return new Phaser.Point(point2.x, point2.y).subtract(point1.x, point1.y);
+	}
+
+	//------------------------------------------------------------------------------
 	public static getRandomElementFrom(source: any[])
 	{
 		if (source.length === 0)

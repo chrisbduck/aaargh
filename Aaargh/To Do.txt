@@ -1,6 +1,7 @@
 ﻿- Features
 	- Guard patrols
 	- Hugs
+	- Lights
 
 
 - Art
@@ -11,6 +12,7 @@
 	- Hug particles
 	- Buildings
 	- Vision
+	- Animations
 
 - Music
 - Sounds

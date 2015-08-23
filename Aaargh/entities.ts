@@ -36,6 +36,8 @@ class Entity
 	static SAY_SIZE_PX = 18;
 	static MAX_UNSCALED_SCARE = 32;
 	static MIN_UNSCALED_SCARE_SQ = Entity.MAX_UNSCALED_SCARE * Entity.MAX_UNSCALED_SCARE;
+	static CLOSE_DIST = 12;
+	static CLOSE_DIST_SQ = Entity.CLOSE_DIST * Entity.CLOSE_DIST;
 
 	public sprite: Phaser.Sprite;
 	public body: Phaser.Physics.Arcade.Body;
@@ -149,6 +151,10 @@ class Entity
 		if (facingRatio < minSightAngleRatio)
 			return false;
 
+		// Check if obscured by tiles
+		if (level.getTilesBetweenPoints(thisPos, playerPos).length > 0)
+			return false;
+
 		return true;
 	}
 
@@ -182,9 +188,21 @@ class Entity
 	//------------------------------------------------------------------------------
 	protected moveTowardsPlayer(speed: number)
 	{
-		var angleToPlayer = this.sprite.position.angle(player.sprite.position);
-		this.body.velocity = Utils.getPointFromPolar(angleToPlayer, speed);
-		this.setFacingDir(this.body.velocity);
+		this.moveTowardsPoint(player.sprite.position, speed);
+	}
+
+	//------------------------------------------------------------------------------
+	protected moveTowardsPoint(point: Phaser.Point, speed: number, changeFacingDir: boolean = true)
+	{
+		//var angleToPoint = this.sprite.position.angle(point);
+		//this.body.velocity = Utils.getPointFromPolar(angleToPoint, speed);
+		//this.setFacingDir(this.body.velocity);
+
+		this.body.velocity = Utils.offsetFromPoint1To2(this.sprite.position, point).normalize().multiply(speed, speed);
+		if (changeFacingDir)
+			this.setFacingDir(this.body.velocity);
+
+
 		//var targetVel: Phaser.Point = Utils.getPointFromPolar(angleToPlayer, Guard.NORMAL_VEL);
 		//var velDiff: Phaser.Point = targetVel.subtract(this.body.velocity.x, this.body.velocity.y);
 		//this.body.acceleration.setTo(velDiff.x * Guard.ACCELERATION, velDiff.y * Guard.ACCELERATION);
@@ -271,6 +289,12 @@ class Entity
 		new ScareEmitter(this.sprite.position.x, this.sprite.position.y, points);
 		app.addScarePoints(points);
 	}
+
+	//------------------------------------------------------------------------------
+	protected hasReachedPoint(point: Phaser.Point): boolean
+	{
+		return Utils.distSqBetweenPoints(this.sprite.position, point) <= Entity.CLOSE_DIST_SQ;
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -281,6 +305,7 @@ var guardGroup: Phaser.Group;
 
 class Guard extends Entity
 {
+	static PATROL_SPEED = 100;
 	static CHASE_SPEED = 180;
 	static FLEE_SPEED = 180;
 	static ACCELERATION = 1800;
@@ -296,13 +321,23 @@ class Guard extends Entity
 	static ALERT_THRESHOLD = 128;
 	static ALERT_THRESHOLD_SQ = Guard.ALERT_THRESHOLD * Guard.ALERT_THRESHOLD;
 	static ALERT_PAUSE_MS = 800;
+	static LOST_PLAYER_GIVE_UP_MS = 4000;
+
+	static STATE_STANDING = 0;
+	static STATE_CHASING = 1;
+	static STATE_FLEEING = 2;
+	static STATE_PATROLLING = 3;
 
 	private movePaused: boolean;
-	private isChasing: boolean;
-	private isFleeing: boolean;
+	private state: number;
 	private spottedPlayerTimer: Phaser.TimerEvent;
 	private alertTimer: Phaser.TimerEvent;
 	private alertPosition: Phaser.Point;
+	private patrolRoute: Phaser.Point[];
+	private nextPatrolPointIndex: number;
+	private timeLastSawPlayer: number;
+	private positionLastSawPlayer: Phaser.Point;
+	private lostPlayerReachedPoint: boolean;
 
 	//------------------------------------------------------------------------------
 	constructor(sprite: Phaser.Sprite)
@@ -311,61 +346,127 @@ class Guard extends Entity
 		this.body.maxVelocity.setTo(Guard.CHASE_SPEED, Guard.CHASE_SPEED);
 		this.body.drag.setTo(Guard.DRAG, Guard.DRAG);
 		this.movePaused = false;
-		this.isChasing = false;
-		this.isFleeing = false;
+		this.state = Guard.STATE_STANDING;
 		this.spottedPlayerTimer = null;
 		this.alertTimer = null;
 		this.alertPosition = null;
 		this.textStyle['fill'] = Utils.getRandomElementFrom(["yellow", "orange", "indianred", "coral", "darkorange", "orangered"])
+		this.patrolRoute = null;
+		this.timeLastSawPlayer = 0;
+		this.positionLastSawPlayer = new Phaser.Point();
 	}
 
 	//------------------------------------------------------------------------------
 	public update()
 	{
+		// Init patrol route if needed
+		if (this.patrolRoute === null)
+		{
+			this.patrolRoute = level.getPatrolRouteStartingAt(this.sprite.position);
+			if (this.patrolRoute.length > 0)
+				this.patrolToPointIndex(0);
+		}
+
 		var physics = game.physics.arcade;
 
 		// Always collide with the player
 		var touchingPlayer = physics.collide(this.sprite, player.sprite);
 
-		// Chasing
-		if (this.isChasing)
+		var canSeePlayer = this.canSeePlayer(Guard.MIN_SIGHT_ANGLE_RATIO, Guard.MAX_SIGHT_RANGE_SQ);
+		if (canSeePlayer)
 		{
-			if (!this.movePaused)
-			{
-				// If the guard is touching the player, hit the player, then pause them for a bit
-				if (touchingPlayer)
+			this.timeLastSawPlayer = game.time.now;
+			this.positionLastSawPlayer = player.sprite.position.clone();
+			this.lostPlayerReachedPoint = false;
+		}
+
+		switch (this.state)
+		{
+			case Guard.STATE_CHASING:
+				if (!this.movePaused)
 				{
-					this.movePaused = true;
-					game.time.events.add(Guard.HIT_PAUSE_MS, () => this.movePaused = false);
-					this.say(Utils.getRandomElementFrom(["<biff>", "<boff>", "<thump>", "<thock>", "<whump>", "<whomp>", "<bam>", "<kapow>"]));
-					player.hit(1);
+					// If the guard is touching the player, hit the player, then pause them for a bit
+					if (touchingPlayer)
+					{
+						this.movePaused = true;
+						game.time.events.add(Guard.HIT_PAUSE_MS, () => this.movePaused = false);
+						this.say(Utils.getRandomElementFrom(["<biff>", "<boff>", "<thump>", "<thock>", "<whump>", "<whomp>", "<bam>", "<kapow>"]));
+						player.receiveHit(1);
+					}
+					else
+					{
+						// If the guard hasn't seen the player for too long, give up and go back to patrolling
+						if (!canSeePlayer && game.time.now - this.timeLastSawPlayer >= Guard.LOST_PLAYER_GIVE_UP_MS)
+						{
+							this.say(Utils.getRandomElementFrom(["Lost it!", "Boring chase anyway.", "Maybe it was nothing.", "It can't hide forever.",
+																"It'll turn up.", "Curses!", "Bah!", "Humbug!", "Foiled again!"]));
+							this.patrolToPointIndex(this.nextPatrolPointIndex);
+						}
+						else
+						{
+							// Move towards the player if we can see them, or the place we last saw them if not
+							var targetPoint: Phaser.Point = canSeePlayer ? player.sprite.position : this.positionLastSawPlayer;
+							if (!canSeePlayer && this.hasReachedPoint(targetPoint))
+							{
+								// Can't see player, and got to the last place we saw them.  Just stay still for a bit until the player turns up or we give up above
+								if (!this.lostPlayerReachedPoint)
+								{
+									this.lostPlayerReachedPoint = true;
+									this.say(Utils.getRandomElementFrom(["Hmmm...", "Where'd it go?", "I'm confused.", "What happened?"]));
+								}
+							}
+							else
+								this.moveTowardsPoint(targetPoint, Guard.CHASE_SPEED);
+						}
+					}
 				}
 				else
-					this.moveTowardsPlayer(Guard.CHASE_SPEED);
-			}
-			else
-				this.faceTowardsPlayer();
-		}
-		// Fleeing
-		else if (this.isFleeing)
-		{
-			if (!this.movePaused)
-				this.moveAwayFromPlayer(Guard.FLEE_SPEED);
-		}
-		// Watching
-		else if (this.spottedPlayerTimer == null && this.canSeePlayer(Guard.MIN_SIGHT_ANGLE_RATIO, Guard.MAX_SIGHT_RANGE_SQ))
-		{
-			this.cancelAlertTimer();
-			this.spottedPlayerTimer = game.time.events.add(Guard.BEFORE_SAW_PLAYER_PAUSE_MS, () =>
-			{
-				this.say(Utils.getRandomElementFrom(["Villain!", "Monster!", "Ahoy!", "Who are you?!", "Stop, creature!", "Stay where you are!", "Yarrrr!"]));
-				this.isChasing = true;
-				this.movePaused = true;
-				game.time.events.add(Guard.AFTER_SAW_PLAYER_PAUSE_MS, () => this.movePaused = false);
-			});
+					this.faceTowardsPlayer();
+				break;
+
+			case Guard.STATE_FLEEING:
+				if (!this.movePaused)
+					this.moveAwayFromPlayer(Guard.FLEE_SPEED);
+				break;
+
+			case Guard.STATE_PATROLLING:
+				if (!this.movePaused)
+				{
+					var patrolPoint: Phaser.Point = this.patrolRoute[this.nextPatrolPointIndex];
+					this.moveTowardsPoint(patrolPoint, Guard.PATROL_SPEED, false);	// only change the facing dir when changing a patrol point
+					if (this.hasReachedPoint(patrolPoint))
+						this.patrolToPointIndex(this.nextPatrolPointIndex + 1);
+				}
+				// Fall through and look for the player.
+
+			default:
+				if (this.spottedPlayerTimer == null && canSeePlayer)
+				{
+					this.cancelAlertTimer();
+					this.spottedPlayerTimer = game.time.events.add(Guard.BEFORE_SAW_PLAYER_PAUSE_MS, () =>
+					{
+						this.say(Utils.getRandomElementFrom(["Villain!", "Monster!", "Ahoy!", "Who are you?!", "Stop, creature!", "Stay where you are!", "Yarrrr!", "What's all this, then?"]));
+						this.state = Guard.STATE_CHASING;
+						this.movePaused = true;
+						this.spottedPlayerTimer = null;
+						game.time.events.add(Guard.AFTER_SAW_PLAYER_PAUSE_MS, () => this.movePaused = false);
+					});
+				}
+				break;
 		}
 
 		super.update();
+	}
+
+	//------------------------------------------------------------------------------
+	private patrolToPointIndex(firstPoint: number = null)
+	{
+		if (firstPoint != null)
+			this.nextPatrolPointIndex = (firstPoint >= this.patrolRoute.length) ? 0 : firstPoint;
+
+		var patrolPoint: Phaser.Point = this.patrolRoute[this.nextPatrolPointIndex];
+		this.setFacingDir(Utils.offsetFromPoint1To2(this.sprite.position, patrolPoint));
+		this.state = Guard.STATE_PATROLLING;
 	}
 
 	//------------------------------------------------------------------------------
@@ -382,14 +483,14 @@ class Guard extends Entity
 	protected handleNoiseMagnitudeSq(magnitudeSq: number, position: Phaser.Point)
 	{
 		// Ignore sounds when chasing or fleeing
-		if (this.isChasing || this.isFleeing)
+		if (this.state === Guard.STATE_CHASING || this.state === Guard.STATE_FLEEING)
 			return;
 
 		// Check for scare
 		if (magnitudeSq <= Guard.SCARE_THRESHOLD_SQ)
 		{
 			this.stopWatching();
-			this.isFleeing = true;
+			this.state = Guard.STATE_FLEEING;
 			this.movePaused = true;
 			game.time.events.add(200, () =>
 			{
