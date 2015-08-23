@@ -12,6 +12,7 @@ class Player extends Entity
 	static DIAG_FACTOR = 0.7071;
 	static ACCELERATION = 2000;
 	static DRAG = 1000;
+	static SHOUT_HOLD_LIMIT_MS = 1000;
 
 	private canMove: boolean;
 	private cursorKeys: Phaser.CursorKeys;
@@ -109,13 +110,23 @@ class Player extends Entity
 		if (!this.canMove)
 			return;
 
-		if (key.keyCode === Phaser.Keyboard.SPACEBAR)
-		{
-			this.say(Utils.getRandomElementFrom(["Boo!", "Raaa!", "Raaaar!", "Roooarrr!", "Grrr!", "Bwaha!", "Boogabooga!"]));
-			var noiseHandler = (entitySprite: IEntitySprite) => entitySprite.entity.handleNoise(this.sprite.position);
-			civilianGroup.forEachAlive(noiseHandler, null);
-			guardGroup.forEachAlive(noiseHandler, null);
-		}
+	}
+
+	//------------------------------------------------------------------------------
+	public prepareShout()
+	{
+		this.say("...", true);	// hold
+	}
+
+	//------------------------------------------------------------------------------
+	public shout(holdDuration: number)
+	{
+		var volume: number = 1 + holdDuration / Player.SHOUT_HOLD_LIMIT_MS;		// range [1, 2]
+
+		this.say(Utils.getRandomElementFrom(["Boo!", "Raaa!", "Raaaar!", "Roooarrr!", "Grrr!", "Bwaha!", "Boogabooga!"]), false, volume);
+		var noiseHandler = (entitySprite: IEntitySprite) => entitySprite.entity.handleNoise(this.sprite.position, volume);
+		civilianGroup.forEachAlive(noiseHandler, null);
+		guardGroup.forEachAlive(noiseHandler, null);
 	}
 
 	//------------------------------------------------------------------------------

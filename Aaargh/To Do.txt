@@ -1,0 +1,21 @@
+﻿- Features
+	- Guard patrols
+	- Hugs
+
+
+- Art
+	- Guards
+	- Monster
+	- Civilians
+	- Scare particles
+	- Hug particles
+	- Buildings
+	- Vision
+
+- Music
+- Sounds
+	- Player makes scare noise
+	- Getting scared
+	- Spotted player
+	- Hug
+	- Guard hits player

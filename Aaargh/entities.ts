@@ -31,7 +31,11 @@ var DIRECTIONS: Phaser.Point[] = [new Phaser.Point(1, 0), new Phaser.Point(0, 1)
 //------------------------------------------------------------------------------
 class Entity
 {
-	static SAY_TIME_MS = 2000;
+	static SAY_TIME_MS = 1000;
+	static SAY_FADE_TIME_MS = 500;
+	static SAY_SIZE_PX = 18;
+	static MAX_UNSCALED_SCARE = 32;
+	static MIN_UNSCALED_SCARE_SQ = Entity.MAX_UNSCALED_SCARE * Entity.MAX_UNSCALED_SCARE;
 
 	public sprite: Phaser.Sprite;
 	public body: Phaser.Physics.Arcade.Body;
@@ -59,7 +63,7 @@ class Entity
 		(<IEntitySprite>sprite).entity = this;
 		this.saying = null;
 		this.sayingEvent = null;
-		this.textStyle = { font: "18px 'Comic Sans',cursive", align: "center", fill: "white" };
+		this.textStyle = { align: "center", fill: "white" };
 		this.prevVel = new Phaser.Point();
 		this.setFacingDir(Utils.getRandomElementFrom(DIRECTIONS));
 		this.isWatching = false;
@@ -84,20 +88,30 @@ class Entity
 	}
 
 	//------------------------------------------------------------------------------
-	public say(text: string)
+	public say(text: string, held: boolean = false, scale: number = 1)
 	{
 		// Remove any previous saying
 		if (this.saying != null)
 		{
 			this.saying.destroy();
-			game.time.events.remove(this.sayingEvent);
-			this.sayingEvent = null;
+			if (this.sayingEvent)
+			{
+				game.time.events.remove(this.sayingEvent);
+				this.sayingEvent = null;
+			}
 		}
 		
+		var fontSize = Math.round(Entity.SAY_SIZE_PX * scale);
+		this.textStyle['font'] = fontSize + "px 'Comic Sans',cursive";
+
 		// Add a new one
 		this.saying = game.add.text(0, 0, text, this.textStyle);
-		this.saying.anchor.set(0.5, 0.0);
-		this.sayingEvent = game.time.events.add(Entity.SAY_TIME_MS, () => this.saying.destroy());
+		this.saying.anchor.set(0.5, 0.5);
+		if (!held)
+		{
+			game.add.tween(this.saying.scale).to({ 'x': 0, 'y': 0 }, Entity.SAY_FADE_TIME_MS, Phaser.Easing.Quadratic.Out, true, Entity.SAY_TIME_MS);
+			this.sayingEvent = game.time.events.add(Entity.SAY_TIME_MS + Entity.SAY_FADE_TIME_MS, () => this.saying.destroy());
+		}
 		this.updateSayTextPosition();
 	}
 
@@ -145,7 +159,7 @@ class Entity
 			return;
 		
 		this.saying.x = this.sprite.x;
-		this.saying.y = this.sprite.y - this.sprite.height * 0.5 - <number>this.saying.fontSize * 1.4;
+		this.saying.y = this.sprite.y - this.sprite.height * 0.5 - <number>this.saying.fontSize * 0.7;
 	}
 
 	//------------------------------------------------------------------------------
@@ -181,10 +195,15 @@ class Entity
 	//------------------------------------------------------------------------------
 	protected faceTowardsPlayer()
 	{
+		this.faceTowardsPoint(player.sprite.position);
+	}
+
+	//------------------------------------------------------------------------------
+	protected faceTowardsPoint(point: Phaser.Point)
+	{
 		var thisPos = this.sprite.position;
-		var playerPos = player.sprite.position;
-		var offsetToPlayer = new Phaser.Point(playerPos.x, playerPos.y).subtract(thisPos.x, thisPos.y);
-		this.setFacingDir(offsetToPlayer);
+		var offsetToPoint = new Phaser.Point(point.x, point.y).subtract(thisPos.x, thisPos.y);
+		this.setFacingDir(offsetToPoint);
 	}
 
 	//------------------------------------------------------------------------------
@@ -230,6 +249,28 @@ class Entity
 		var imageAngle = Math.PI * -0.5;
 		Utils.setSpriteRotation(this.watchingSprite, this.facingAngle, imageAngle);
 	}
+
+	//------------------------------------------------------------------------------
+	protected scaledScare(points: number, magnitudeSq: number, thresholdSq: number, quotes: string[] = null)
+	{
+		// Magnitude is best when *lowest*, so highest scale is at min unscaled scare
+
+		var magnitudeRatio = 1 - (magnitudeSq - Entity.MIN_UNSCALED_SCARE_SQ) / (thresholdSq - Entity.MIN_UNSCALED_SCARE_SQ);
+		var pointsMagnitudeScale = Phaser.Math.linear(0.3, 1.5, magnitudeRatio);
+		var scaledPoints = Math.round(points * pointsMagnitudeScale);
+		this.scare(scaledPoints, quotes);
+	}
+
+	//------------------------------------------------------------------------------
+	protected scare(points: number, quotes: string[] = null)
+	{
+		if (quotes === null)
+			quotes = Entity.SCARED_QUOTES;
+
+		this.say(Utils.getRandomElementFrom(quotes));
+		new ScareEmitter(this.sprite.position.x, this.sprite.position.y, points);
+		app.addScarePoints(points);
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -245,16 +286,23 @@ class Guard extends Entity
 	static ACCELERATION = 1800;
 	static DRAG = 1200;
 	static HIT_PAUSE_MS = 1000;
-	static ALERT_PAUSE_MS = 1000;
-	static MIN_SIGHT_ANGLE_RATIO = 0.5;		// max 60 degrees from straight on
+	static BEFORE_SAW_PLAYER_PAUSE_MS = 300;
+	static AFTER_SAW_PLAYER_PAUSE_MS = 1000;
+	static MIN_SIGHT_ANGLE_RATIO = 0.7071;		// max 45 degrees from straight on
 	static MAX_SIGHT_RANGE = 200;
 	static MAX_SIGHT_RANGE_SQ = Guard.MAX_SIGHT_RANGE * Guard.MAX_SIGHT_RANGE;
 	static SCARE_THRESHOLD = 64;
 	static SCARE_THRESHOLD_SQ = Guard.SCARE_THRESHOLD * Guard.SCARE_THRESHOLD;
+	static ALERT_THRESHOLD = 128;
+	static ALERT_THRESHOLD_SQ = Guard.ALERT_THRESHOLD * Guard.ALERT_THRESHOLD;
+	static ALERT_PAUSE_MS = 800;
 
 	private movePaused: boolean;
 	private isChasing: boolean;
 	private isFleeing: boolean;
+	private spottedPlayerTimer: Phaser.TimerEvent;
+	private alertTimer: Phaser.TimerEvent;
+	private alertPosition: Phaser.Point;
 
 	//------------------------------------------------------------------------------
 	constructor(sprite: Phaser.Sprite)
@@ -265,6 +313,9 @@ class Guard extends Entity
 		this.movePaused = false;
 		this.isChasing = false;
 		this.isFleeing = false;
+		this.spottedPlayerTimer = null;
+		this.alertTimer = null;
+		this.alertPosition = null;
 		this.textStyle['fill'] = Utils.getRandomElementFrom(["yellow", "orange", "indianred", "coral", "darkorange", "orangered"])
 	}
 
@@ -286,7 +337,7 @@ class Guard extends Entity
 				{
 					this.movePaused = true;
 					game.time.events.add(Guard.HIT_PAUSE_MS, () => this.movePaused = false);
-					this.say(Utils.getRandomElementFrom(["<biff>", "<boff>", "<thump>", "<thock>", "<whump>"]));
+					this.say(Utils.getRandomElementFrom(["<biff>", "<boff>", "<thump>", "<thock>", "<whump>", "<whomp>", "<bam>", "<kapow>"]));
 					player.hit(1);
 				}
 				else
@@ -302,32 +353,65 @@ class Guard extends Entity
 				this.moveAwayFromPlayer(Guard.FLEE_SPEED);
 		}
 		// Watching
-		else if (this.canSeePlayer(Guard.MIN_SIGHT_ANGLE_RATIO, Guard.MAX_SIGHT_RANGE_SQ))
+		else if (this.spottedPlayerTimer == null && this.canSeePlayer(Guard.MIN_SIGHT_ANGLE_RATIO, Guard.MAX_SIGHT_RANGE_SQ))
 		{
-			this.say(Utils.getRandomElementFrom(["Villain!", "Monster!", "Ahoy!", "Who are you?!", "Stop, creature!", "Stay where you are!"]));
-			this.isChasing = true;
-			this.movePaused = true;
-			game.time.events.add(Guard.ALERT_PAUSE_MS, () => this.movePaused = false);
+			this.cancelAlertTimer();
+			this.spottedPlayerTimer = game.time.events.add(Guard.BEFORE_SAW_PLAYER_PAUSE_MS, () =>
+			{
+				this.say(Utils.getRandomElementFrom(["Villain!", "Monster!", "Ahoy!", "Who are you?!", "Stop, creature!", "Stay where you are!", "Yarrrr!"]));
+				this.isChasing = true;
+				this.movePaused = true;
+				game.time.events.add(Guard.AFTER_SAW_PLAYER_PAUSE_MS, () => this.movePaused = false);
+			});
 		}
 
 		super.update();
 	}
 
 	//------------------------------------------------------------------------------
-	protected handleNoiseMagnitudeSq(magnitudeSq: number, position: Phaser.Point)
+	private cancelAlertTimer()
 	{
-		if (this.isChasing || this.isFleeing || magnitudeSq > Guard.SCARE_THRESHOLD_SQ)
+		if (!this.alertTimer)
 			return;
 
-		this.stopWatching();
-		this.isFleeing = true;
-		this.movePaused = true;
-		game.time.events.add(200, () =>
+		game.time.events.remove(this.alertTimer);
+		this.alertTimer = null;
+	}
+
+	//------------------------------------------------------------------------------
+	protected handleNoiseMagnitudeSq(magnitudeSq: number, position: Phaser.Point)
+	{
+		// Ignore sounds when chasing or fleeing
+		if (this.isChasing || this.isFleeing)
+			return;
+
+		// Check for scare
+		if (magnitudeSq <= Guard.SCARE_THRESHOLD_SQ)
 		{
-			this.movePaused = false;
-			this.say(Utils.getRandomElementFrom(Entity.SCARED_QUOTES));
-			app.addScarePoints(10);
-		});
+			this.stopWatching();
+			this.isFleeing = true;
+			this.movePaused = true;
+			game.time.events.add(200, () =>
+			{
+				this.movePaused = false;
+				this.scaledScare(20, magnitudeSq, Guard.SCARE_THRESHOLD_SQ);
+			});
+		}
+		// Check for alert
+		else if (magnitudeSq <= Guard.ALERT_THRESHOLD_SQ)
+		{
+			// Pause for a moment, say something, pause again, then turn
+			this.alertPosition = new Phaser.Point(position.x, position.y);
+			this.alertTimer = game.time.events.add(Guard.ALERT_PAUSE_MS, () =>
+			{
+				this.say(Utils.getRandomElementFrom(["Huh?", "What?", "What was that?", "Hmmm?", "Did I hear something?", "Um...?"]));
+				this.alertTimer = game.time.events.add(Guard.ALERT_PAUSE_MS, () =>
+				{
+					this.cancelAlertTimer();
+					this.faceTowardsPoint(this.alertPosition);
+				});
+			});
+		}
 	}
 }
 
@@ -344,7 +428,7 @@ class Civilian extends Entity
 	static SCARE_THRESHOLD = 100;
 	static SCARE_THRESHOLD_SQ = Civilian.SCARE_THRESHOLD * Civilian.SCARE_THRESHOLD;
 	static MAX_SIGHT_RANGE = 120;
-	static MIN_SIGHT_ANGLE_RATIO = 0.7071;		// max 45 degrees from straight on
+	static MIN_SIGHT_ANGLE_RATIO = 0.866;		// max 30 degrees from straight on
 	static MAX_SIGHT_RANGE_SQ = Civilian.MAX_SIGHT_RANGE * Civilian.MAX_SIGHT_RANGE;
 	static NORMAL_SPEED = 110;
 
@@ -378,10 +462,9 @@ class Civilian extends Entity
 			this.moveAwayFromPlayer(this.walkSpeed);
 		else if (this.canSeePlayer(Civilian.MIN_SIGHT_ANGLE_RATIO, Civilian.MAX_SIGHT_RANGE_SQ))
 		{
-			this.say(Utils.getRandomElementFrom(["Uh-oh...", "Hmmm...", "What's that?", "Who's that?", "Strange...", "I'm outta here..."]));
 			this.isFleeing = true;
 			this.walkSpeed = Civilian.NORMAL_SPEED;
-			app.addScarePoints(1);
+			this.scare(2, ["Uh-oh...", "Hmmm...", "What's that?", "Who's that?", "Strange...", "I'm outta here..."]);
 		}
 
 		super.update();
@@ -404,8 +487,7 @@ class Civilian extends Entity
 			game.time.events.add(200, () =>
 			{
 				this.isFleeing = true;
-				this.say(Utils.getRandomElementFrom(Entity.SCARED_QUOTES));
-				app.addScarePoints(5);
+				this.scaledScare(10, magnitudeSq, Civilian.SCARE_THRESHOLD_SQ);
 			});
 	}
 

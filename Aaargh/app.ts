@@ -19,7 +19,7 @@ var level: Level = null;
 var TILE_SIZE: number = 32;
 var NUM_TILES_X: number = 32;
 var NUM_TILES_Y: number = 20;
-var INITIAL_HEALTH: number = 5;
+var INITIAL_HEALTH: number = 50;
 
 //------------------------------------------------------------------------------
 // Main app
@@ -33,6 +33,9 @@ class App
 	private scarePoints: number;
 	private friendPoints: number;
 	private healthPoints: number;
+	private shoutHeld: boolean;
+	private shouted: boolean;
+	private shoutHoldStart: number;
 
 	//------------------------------------------------------------------------------
     constructor()
@@ -55,7 +58,6 @@ class App
 	//------------------------------------------------------------------------------
 	public startLoad(): void
 	{
-		this.numLoadedFiles = 0;
 		game.load.image('thief', 'data/tex/thief.png');
 		game.load.image('guard', 'data/tex/guard.png');
 		game.load.image('civilian', 'data/tex/dog.png');
@@ -124,6 +126,8 @@ class App
 		this.isRunning = true;
 		this.isPaused = false;
 		this.isAwaitingRestart = false;
+		this.shoutHeld = false;
+		this.shouted = false;
 	}
 
 	//------------------------------------------------------------------------------
@@ -143,16 +147,43 @@ class App
 		if (this.isRunning && !this.isPaused)
 			this.updateGame();
 
-		var lastKey = game.input.keyboard.lastKey;
+		var keyboard = game.input.keyboard;
+		var lastKey = keyboard.lastKey;
 		if (lastKey && lastKey.justDown)
 			this.handleKeyPress();
+
+		// Shout control
+		if (this.isRunning)
+		{
+			var shoutHeld = !!keyboard.isDown(Phaser.Keyboard.SPACEBAR);
+			var shouldShout = false;
+			if (shoutHeld != this.shoutHeld)
+			{
+				if (shoutHeld)
+				{
+					this.shoutHoldStart = game.time.now;
+					this.shouted = false;
+					player.prepareShout();
+				}
+				else
+					shouldShout = true;
+				this.shoutHeld = shoutHeld;
+			}
+			else if (shoutHeld && game.time.now - this.shoutHoldStart >= Player.SHOUT_HOLD_LIMIT_MS)
+				shouldShout = true;
+
+			if (shouldShout && !this.shouted)
+			{
+				player.shout(Math.min(game.time.now - this.shoutHoldStart, Player.SHOUT_HOLD_LIMIT_MS));
+				this.shouted = true;
+			}
+		}
 	}
 
 	//------------------------------------------------------------------------------
 	private handleKeyPress()		// only printable keys
 	{
 		var lastKey = game.input.keyboard.lastKey;
-		console.log("key press", lastKey);
 
 		// Pause
 		if (this.isRunning && lastKey.keyCode === Phaser.Keyboard.P)

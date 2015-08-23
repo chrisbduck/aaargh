@@ -8,7 +8,7 @@ class ScareEmitter
 {
 	constructor(x: number, y: number, count: number)
 	{
-		var emitter = game.add.emitter(x, y, 10);
+		var emitter = game.add.emitter(x, y, count);
 		emitter.makeParticles('scare');
 		emitter.lifespan = 500;
 		emitter.minParticleSpeed.setTo(-300, -190);
@@ -33,7 +33,7 @@ class FriendEmitter
 {
 	constructor(x: number, y: number, count: number)
 	{
-		var emitter = game.add.emitter(x, y, 10);
+		var emitter = game.add.emitter(x, y, count);
 		emitter.makeParticles('friend');
 		emitter.lifespan = 500;
 		emitter.minParticleSpeed.setTo(-300, -190);

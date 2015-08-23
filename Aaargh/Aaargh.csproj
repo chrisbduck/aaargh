@@ -30,6 +30,7 @@
     <Content Include="index.html" />
     <Content Include="phaser\phaser.js" />
     <Content Include="phaser\phaser.min.js" />
+    <Content Include="To Do.txt" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
