@@ -15,11 +15,12 @@ class Level
 {
 	private tilemap: Phaser.Tilemap;
 	public layer: Phaser.TilemapLayer;
-	private grass: Phaser.TileSprite;
+	private ground: Phaser.TileSprite;
 
 	constructor(mapName: string, tilesetName: string)
 	{
-		this.grass = game.add.tileSprite(0, 0, game.world.width, game.world.height, 'grass');
+		this.ground = game.add.tileSprite(0, 0, game.world.width, game.world.height, 'ground');
+		this.ground.tint = 0x808080;
 
 		this.tilemap = game.add.tilemap(mapName);
 		this.tilemap.addTilesetImage(tilesetName);
@@ -29,7 +30,7 @@ class Level
 
 		// Player
 		var tempGroup: Phaser.Group = game.add.group();
-		this.tilemap.createFromTiles(TILE_PLAYER, -1, 'thief', this.layer, tempGroup);
+		this.tilemap.createFromTiles(TILE_PLAYER, -1, 'monster', this.layer, tempGroup);
 		if (tempGroup.children.length !== 1)
 			throw new Error("Should have exactly one player");
 		player = new Player(<Phaser.Sprite>tempGroup.children[0]);
@@ -40,7 +41,7 @@ class Level
 		guardGroup = game.add.group(undefined, 'guards');
 		guardGroup.enableBody = true;
 		guardGroup.enableBodyDebug = true;
-		this.tilemap.createFromTiles(TILE_GUARD, -1, 'guard', this.layer, guardGroup);
+		this.tilemap.createFromTiles(TILE_GUARD, -1, 'policeman', this.layer, guardGroup);
 		guardGroup.forEach(child => new Guard(child), null);
 
 		// Civilians
@@ -64,7 +65,7 @@ class Level
 	public destroy()
 	{
 		this.layer.destroy();
-		this.grass.destroy();
+		this.ground.destroy();
 		this.tilemap.destroy();
 	}
 

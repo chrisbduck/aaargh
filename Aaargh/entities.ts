@@ -48,9 +48,15 @@ class Entity
 	protected prevVel: Phaser.Point;
 	protected facingDir: Phaser.Point;
 	protected facingAngle: number;
+	protected ambientChatter: string[];
+	protected animFrameOverride: number;
 
 	protected isWatching: boolean;
-	private watchingSprite: Phaser.Sprite; 
+	protected isBeingHugged: boolean;
+	protected hugFinishTimer: Phaser.TimerEvent;
+	protected hugDuration: number;
+	protected hugScore: number;
+	private watchingSprite: Phaser.Sprite;
 
 	private static debugCounters: INumDict = {};
 	protected static SCARED_QUOTES: string[] = ["Aaargh!", "Aargh!", "Aaaaaaargh!", "Help!", "Yikes!", "Urk!", "Waaaa!"];
@@ -65,10 +71,16 @@ class Entity
 		(<IEntitySprite>sprite).entity = this;
 		this.saying = null;
 		this.sayingEvent = null;
-		this.textStyle = { align: "center", fill: "white" };
+		this.textStyle = { align: "center", fill: "white", textShadow: "2px 2px 5px black" };
 		this.prevVel = new Phaser.Point();
 		this.setFacingDir(Utils.getRandomElementFrom(DIRECTIONS));
 		this.isWatching = false;
+		this.isBeingHugged = false;
+		this.hugFinishTimer = null;
+		this.hugDuration = 0;
+		this.hugScore = 0;
+		this.ambientChatter = ["..."];
+		this.animFrameOverride = -1;
 
 		// Debug name
 		var count: number = Entity.debugCounters.hasOwnProperty(typeName) ? (Entity.debugCounters[typeName] + 1) : 1;
@@ -90,7 +102,7 @@ class Entity
 	}
 
 	//------------------------------------------------------------------------------
-	public say(text: string, held: boolean = false, scale: number = 1)
+	public say(text: string, held: boolean = false, scale: number = 1, sayTimeScale: number = 1)
 	{
 		// Remove any previous saying
 		if (this.saying != null)
@@ -106,13 +118,15 @@ class Entity
 		var fontSize = Math.round(Entity.SAY_SIZE_PX * scale);
 		this.textStyle['font'] = fontSize + "px 'Comic Sans',cursive";
 
+		var sayTimeMs = Entity.SAY_TIME_MS * sayTimeScale;
+
 		// Add a new one
 		this.saying = game.add.text(0, 0, text, this.textStyle);
 		this.saying.anchor.set(0.5, 0.5);
 		if (!held)
 		{
-			game.add.tween(this.saying.scale).to({ 'x': 0, 'y': 0 }, Entity.SAY_FADE_TIME_MS, Phaser.Easing.Quadratic.Out, true, Entity.SAY_TIME_MS);
-			this.sayingEvent = game.time.events.add(Entity.SAY_TIME_MS + Entity.SAY_FADE_TIME_MS, () => this.saying.destroy());
+			game.add.tween(this.saying.scale).to({ 'x': 0, 'y': 0 }, Entity.SAY_FADE_TIME_MS, Phaser.Easing.Quadratic.Out, true, sayTimeMs);
+			this.sayingEvent = game.time.events.add(sayTimeMs + Entity.SAY_FADE_TIME_MS, () => this.saying.destroy());
 		}
 		this.updateSayTextPosition();
 	}
@@ -286,7 +300,7 @@ class Entity
 			quotes = Entity.SCARED_QUOTES;
 
 		this.say(Utils.getRandomElementFrom(quotes));
-		new ScareEmitter(this.sprite.position.x, this.sprite.position.y, points);
+		new ScareEmitter(this.sprite.position.x, this.sprite.position.y, points * 4);
 		app.addScarePoints(points);
 	}
 
@@ -294,6 +308,64 @@ class Entity
 	protected hasReachedPoint(point: Phaser.Point): boolean
 	{
 		return Utils.distSqBetweenPoints(this.sprite.position, point) <= Entity.CLOSE_DIST_SQ;
+	}
+
+	//------------------------------------------------------------------------------
+	public canBeHugged(): boolean
+	{
+		return false;
+	}
+
+	//------------------------------------------------------------------------------
+	public startHug(): boolean
+	{
+		if (this.isBeingHugged)
+			return false;
+
+		this.isBeingHugged = true;
+		this.hugFinishTimer = game.time.events.add(this.hugDuration, () => this.completeHug());
+		return true;
+	}
+
+	//------------------------------------------------------------------------------
+	protected completeHug()
+	{
+		this.hugFinishTimer = null;
+		this.isBeingHugged = false;
+		app.addFriendPoints(this.hugScore);
+		this.sprite.tint = 0xFF8080;
+		game.add.tween(this.sprite).to({ alpha: 0 }, 1000, Phaser.Easing.Linear.None, true);
+		game.time.events.add(1000, () => this.sprite.destroy());
+		this.stopWatching();
+		this.sprite.alive = false;
+		new FriendEmitter(this.sprite.x, this.sprite.y, this.hugScore * 3);
+	}
+
+	//------------------------------------------------------------------------------
+	public releaseHug(): boolean
+	{
+		if (!this.isBeingHugged)
+			return false;
+
+		this.isBeingHugged = false;
+		game.time.events.remove(this.hugFinishTimer);
+		this.hugFinishTimer = null;
+		return true;
+	}
+
+	//------------------------------------------------------------------------------
+	public triggerChatter()
+	{
+		if (this.ambientChatter.length <= 0)
+			return;
+
+		this.say(Utils.getRandomElementFrom(this.ambientChatter), false, 0.8, 1.4);
+	}
+
+	//------------------------------------------------------------------------------
+	public canChatter(): boolean
+	{
+		return this.sprite.alive && !this.isBeingHugged;
 	}
 }
 
@@ -324,6 +396,11 @@ class Guard extends Entity
 	static LOST_PLAYER_GIVE_UP_MS = 4000;
 	static TOUCHING_STUCK_TIME_MS = 300;
 	static OVERRIDE_TARGET_TIME_MS = 300;
+	static CHASE_ANIM_SPEED = 5;
+
+	static AMBIENT_CHATTER = ['"You can\'t handle the truth!\"', "Grrr. <cough> Grrr.", "Any evildoers here?", "It's quiet... too quiet.", "Beware, interlopers!",
+		"Who you gonna call?", "Villains, watch out!", "Where's my hamster gone?", "Ack. Patrol duty again.", "<yawn>", "Dooby dee...", "Ba ba-dah ba-dah...",
+		"Join the army, they said...", "Only four hours 'til tea time!", "Rats... I hate rats."];
 
 	static STATE_STANDING = 0;
 	static STATE_CHASING = 1;
@@ -363,11 +440,21 @@ class Guard extends Entity
 		this.touchingStartPosition = new Phaser.Point();
 		this.touchingStartTime = 0;
 		this.overrideTarget = null;
+		this.hugDuration = 4000;
+		this.hugScore = 20;
+		this.ambientChatter = Guard.AMBIENT_CHATTER;
+
+		var anims = this.sprite.animations;
+		var animSpeed = Guard.CHASE_ANIM_SPEED;
+		anims.add('chase', [1, 2], animSpeed, true);
 	}
 
 	//------------------------------------------------------------------------------
 	public update()
 	{
+		if (!this.sprite.alive)
+			return;
+
 		// Init patrol route if needed
 		if (this.patrolRoute === null)
 		{
@@ -383,6 +470,9 @@ class Guard extends Entity
 
 		var touchingLevel = physics.collide(this.sprite, level.layer);
 
+		if (this.isBeingHugged)
+			return;
+
 		// Give the guard a sight distance boost when they're chasing so they don't lose the player too easily
 		var maxSightRangeSq = Guard.MAX_SIGHT_RANGE_SQ;
 		if (this.state === Guard.STATE_CHASING)
@@ -397,6 +487,7 @@ class Guard extends Entity
 		}
 
 		var targetPoint: Phaser.Point = null;
+		var playChasingAnim: boolean = false;
 
 		switch (this.state)
 		{
@@ -408,7 +499,7 @@ class Guard extends Entity
 					{
 						this.movePaused = true;
 						game.time.events.add(Guard.HIT_PAUSE_MS, () => this.movePaused = false);
-						this.say(Utils.getRandomElementFrom(["<biff>", "<boff>", "<thump>", "<thock>", "<whump>", "<whomp>", "<bam>", "<kapow>"]));
+						this.say(Utils.getRandomElementFrom(["<biff>", "<boff>", "<thump>", "<thock>", "<whump>", "<whomp>", "<bam>", "<kapow>", "<bop>"]));
 						player.receiveHit(1);
 					}
 					else
@@ -430,7 +521,7 @@ class Guard extends Entity
 								if (!this.lostPlayerReachedPoint)
 								{
 									this.lostPlayerReachedPoint = true;
-									this.say(Utils.getRandomElementFrom(["Hmmm...", "Where'd it go?", "I'm confused.", "What happened?"]));
+									this.say(Utils.getRandomElementFrom(["Hmmm...", "Where'd it go?", "I'm confused.", "What happened?", "Ummm..."]));
 								}
 							}
 							else
@@ -440,6 +531,8 @@ class Guard extends Entity
 				}
 				else
 					this.faceTowardsPlayer();
+
+				playChasingAnim = !this.movePaused;
 				break;
 
 			case Guard.STATE_FLEEING:
@@ -459,18 +552,17 @@ class Guard extends Entity
 
 			default:
 				if (this.spottedPlayerTimer == null && canSeePlayer)
-				{
-					this.cancelAlertTimer();
-					this.spottedPlayerTimer = game.time.events.add(Guard.BEFORE_SAW_PLAYER_PAUSE_MS, () =>
-					{
-						this.say(Utils.getRandomElementFrom(["Villain!", "Monster!", "Ahoy!", "Who are you?!", "Stop, creature!", "Stay where you are!", "Yarrrr!", "What's all this, then?"]));
-						this.state = Guard.STATE_CHASING;
-						this.movePaused = true;
-						this.spottedPlayerTimer = null;
-						game.time.events.add(Guard.AFTER_SAW_PLAYER_PAUSE_MS, () => this.movePaused = false);
-					});
-				}
+					this.alert();
 				break;
+		}
+
+		if (playChasingAnim)
+			this.sprite.animations.play('chase');
+		else
+		{
+			this.sprite.animations.stop();
+			if (this.state !== Guard.STATE_CHASING)
+				this.sprite.frame = 0;
 		}
 
 		super.update();
@@ -481,16 +573,14 @@ class Guard extends Entity
 			// Check if we just started touching something
 			if (this.touchingStartTime === 0)
 			{
-				console.log(this.debugName, "now touching level");
 				this.touchingStartPosition = this.sprite.position.clone();
 				this.touchingStartTime = game.time.now;
 			}
 			// Check if we've been touching things for too long and haven't gone anywhere
 			else if (game.time.now - this.touchingStartTime >= Guard.TOUCHING_STUCK_TIME_MS)
 			{
-				if (this.hasReachedPoint(this.touchingStartPosition))
+				if (targetPoint != null && this.hasReachedPoint(this.touchingStartPosition))
 				{
-					console.log(this.debugName, "stuck on level");
 					// Stuck.  Pick a new target in a perpendicular direction for a moment
 					var offsetToTarget: Phaser.Point = Utils.offsetFromPoint1To2(this.sprite.position, targetPoint);
 					var perpOffset: Phaser.Point = (Math.random() < 0.5) ? offsetToTarget.perp() : offsetToTarget.rperp();
@@ -500,15 +590,14 @@ class Guard extends Entity
 				}
 				else
 				{
-					console.log(this.debugName, "unsticking temporarily");
+					// Restart sticking check
 					this.touchingStartTime = 0;
 				}
 			}
 		}
 		else
 		{
-			if (this.touchingStartTime > 0)
-				console.log(this.debugName, "stopped touching level");
+			// Not stuck
 			this.touchingStartTime = 0;
 		}
 		if (this.overrideTarget && this.overrideTargetEndTime <= game.time.now)
@@ -578,6 +667,65 @@ class Guard extends Entity
 			});
 		}
 	}
+
+	//------------------------------------------------------------------------------
+	public canBeHugged(): boolean
+	{
+		return this.state === Guard.STATE_PATROLLING || this.state === Guard.STATE_STANDING;
+	}
+
+	//------------------------------------------------------------------------------
+	public startHug(): boolean
+	{
+		if (!super.startHug())
+			return false;
+
+		game.time.events.add(200, () => this.say(Utils.getRandomElementFrom(["Erk!", "I say!", "What... who...", "Hmph!", "What?", "Er..."])));
+		return true;
+	}
+
+	//------------------------------------------------------------------------------
+	protected completeHug()
+	{
+		super.completeHug();
+		this.say(Utils.getRandomElementFrom(["Oh - thanks, old chap!", "I needed that!", "There there...", "Jolly good, jolly good.", "Spiffing, what.", "Lovely!"]));
+	}
+
+	//------------------------------------------------------------------------------
+	public releaseHug(): boolean
+	{
+		if (!super.releaseHug())
+			return false;
+
+		this.state = Guard.STATE_CHASING;
+		this.movePaused = true;
+		this.alert();
+		return true;
+	}
+
+	//------------------------------------------------------------------------------
+	protected alert()
+	{
+		if (this.spottedPlayerTimer)
+			return;
+
+		this.cancelAlertTimer();
+		this.spottedPlayerTimer = game.time.events.add(Guard.BEFORE_SAW_PLAYER_PAUSE_MS, () =>
+		{
+			this.say(Utils.getRandomElementFrom(["Villain!", "Monster!", "Ahoy!", "Who are you?!", "Stop, creature!", "Stay where you are!", "Yarrrr!",
+				"What's all this, then?", "Oi!", "Have at ye!", "Hey, you!"]));
+			this.state = Guard.STATE_CHASING;
+			this.movePaused = true;
+			this.spottedPlayerTimer = null;
+			game.time.events.add(Guard.AFTER_SAW_PLAYER_PAUSE_MS, () => this.movePaused = false);
+		});
+	}
+
+	//------------------------------------------------------------------------------
+	public canChatter(): boolean
+	{
+		return super.canChatter() && this.state === Guard.STATE_PATROLLING || this.state === Guard.STATE_STANDING;
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -600,6 +748,10 @@ class Civilian extends Entity
 	static WANDER_MAX_INTERVAL_MS = 7000;
 	static WANDER_MIN_DIST = 24;
 	static WANDER_MAX_DIST = 80;
+	static WALK_ANIM_SPEED = 10;
+	static AMBIENT_CHATTER = ["La la la...", "Dooby doo...", "What a lovely day!", "No scary monsters here!", "<cough>", "<sneeze>", "<sigh>",
+		"<whistles>", "Zip-a-dee-doo-dah...", "I'm hungry.", "<snort>", "Ba ba ba...", "Dee dee dee...", "Hmmm... dair... dah-ray?",
+		"Look... a world in the sky!", "I miss my pet rock.", "Hrmph.", "Look at the pretty bird!"];
 
 	private isFleeing: boolean;
 	private walkSpeed: number;
@@ -619,6 +771,13 @@ class Civilian extends Entity
 		//console.log(this.debugName, this.textStyle['fill']);
 		this.nextWander = null;
 		this.target = null;
+		this.hugDuration = 2000;
+		this.hugScore = 10;
+		this.ambientChatter = Civilian.AMBIENT_CHATTER;
+
+		var anims = this.sprite.animations;
+		var animSpeed = Civilian.WALK_ANIM_SPEED;
+		anims.add('walk', [0, 1], animSpeed, true);
 	}
 
 	//------------------------------------------------------------------------------
@@ -630,35 +789,45 @@ class Civilian extends Entity
 		// Always collide with the player
 		game.physics.arcade.collide(this.sprite, player.sprite);
 
-		if (this.isFleeing)
-			this.moveAwayFromPlayer(this.walkSpeed);
-		else if (this.canSeePlayer(Civilian.MIN_SIGHT_ANGLE_RATIO, Civilian.MAX_SIGHT_RANGE_SQ))
+		var isMoving: boolean = false;
+
+		if (!this.isBeingHugged)
 		{
-			this.isFleeing = true;
-			this.walkSpeed = Civilian.NORMAL_SPEED;
-			this.scare(2, ["Uh-oh...", "Hmmm...", "What's that?", "Who's that?", "Strange...", "I'm outta here..."]);
-		}
-		else if (this.target != null)
-		{
-			this.moveTowardsPoint(this.target, Civilian.NORMAL_SPEED);
-			if (this.hasReachedPoint(this.target))
-				this.target = null;
-		}
-		else if (this.nextWander == null)
-		{
-			var intervalMs = Phaser.Math.linear(Civilian.WANDER_MIN_INTERVAL_MS, Civilian.WANDER_MAX_INTERVAL_MS, Math.random());
-			this.nextWander = game.time.events.add(intervalMs, () =>
+			if (this.isFleeing)
 			{
-				this.nextWander = null;
-				if (!this.isFleeing)
+				this.moveAwayFromPlayer(this.walkSpeed);
+				isMoving = true;
+			}
+			else if (this.canSeePlayer(Civilian.MIN_SIGHT_ANGLE_RATIO, Civilian.MAX_SIGHT_RANGE_SQ))
+				this.alert();
+			else if (this.target != null)
+			{
+				this.moveTowardsPoint(this.target, Civilian.NORMAL_SPEED);
+				isMoving = true;
+				if (this.hasReachedPoint(this.target))
+					this.target = null;
+			}
+			else if (this.nextWander == null)
+			{
+				var intervalMs = Phaser.Math.linear(Civilian.WANDER_MIN_INTERVAL_MS, Civilian.WANDER_MAX_INTERVAL_MS, Math.random());
+				this.nextWander = game.time.events.add(intervalMs, () =>
 				{
-					var angle = Phaser.Math.linear(-Math.PI, Math.PI, Math.random());
-					var speed = Phaser.Math.linear(Civilian.WANDER_MIN_DIST, Civilian.WANDER_MAX_DIST, Math.random());
-					var offset = Utils.getPointFromPolar(angle, speed);
-					this.target = this.sprite.position.clone().add(offset.x, offset.y);
-				}
-			});
+					this.nextWander = null;
+					if (!this.isFleeing)
+					{
+						var angle = Phaser.Math.linear(-Math.PI, Math.PI, Math.random());
+						var speed = Phaser.Math.linear(Civilian.WANDER_MIN_DIST, Civilian.WANDER_MAX_DIST, Math.random());
+						var offset = Utils.getPointFromPolar(angle, speed);
+						this.target = this.sprite.position.clone().add(offset.x, offset.y);
+					}
+				});
+			}
 		}
+
+		if (isMoving)
+			this.sprite.animations.play('walk', Civilian.WALK_ANIM_SPEED);
+		else
+			this.sprite.animations.stop();
 
 		super.update();
 	}
@@ -689,5 +858,54 @@ class Civilian extends Entity
 	{
 		console.log(this.debugName, "escaped");
 		this.sprite.destroy();
+	}
+
+	//------------------------------------------------------------------------------
+	public canBeHugged(): boolean
+	{
+		return !this.isFleeing;
+	}
+
+	//------------------------------------------------------------------------------
+	public startHug(): boolean
+	{
+		if (!super.startHug())
+			return false;
+
+		game.time.events.remove(this.nextWander);
+		this.nextWander = null;
+		game.time.events.add(200, () => this.say(Utils.getRandomElementFrom(["Oof!", "Wha...?", "Erm...", "Um...", "Huh...?", "Whoa..."])));
+		return true;
+	}
+
+	//------------------------------------------------------------------------------
+	protected completeHug()
+	{
+		super.completeHug();
+		this.say(Utils.getRandomElementFrom(["What a nice monster!", "He's not so bad!", "You're not so scary!", "What a great hugger!", "You're the best monster!"]));
+	}
+
+	//------------------------------------------------------------------------------
+	public releaseHug(): boolean
+	{
+		if (!super.releaseHug())
+			return false;
+
+		this.alert();
+		return true;
+	}
+
+	//------------------------------------------------------------------------------
+	protected alert()
+	{
+		this.isFleeing = true;
+		this.walkSpeed = Civilian.NORMAL_SPEED;
+		this.scare(2, ["Uh-oh...", "Hmmm...", "What's that?", "Who's that?", "Strange...", "I'm outta here..."]);
+	}
+
+	//------------------------------------------------------------------------------
+	public canChatter(): boolean
+	{
+		return super.canChatter() && !this.isFleeing;
 	}
 }

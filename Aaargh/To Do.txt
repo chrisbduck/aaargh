@@ -1,20 +1,18 @@
 ﻿- Features
-	- Guard patrols
-	- Hugs
+	- Finish level/game (win)
 	- Lights
 
 
 - Art
 	- Guards
-	- Monster
 	- Civilians
-	- Scare particles
-	- Hug particles
 	- Buildings
-	- Vision
 	- Animations
 
 - Music
+
+
+
 - Sounds
 	- Player makes scare noise
 	- Getting scared

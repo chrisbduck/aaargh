@@ -36,6 +36,9 @@ class App
 	private shoutHeld: boolean;
 	private shouted: boolean;
 	private shoutHoldStart: number;
+	private hugHeld: boolean;
+	private hugHoldStart: number;
+	private chatterEvent: Phaser.TimerEvent;
 
 	//------------------------------------------------------------------------------
     constructor()
@@ -58,14 +61,15 @@ class App
 	//------------------------------------------------------------------------------
 	public startLoad(): void
 	{
-		game.load.image('thief', 'data/tex/thief.png');
-		game.load.image('guard', 'data/tex/guard.png');
-		game.load.image('civilian', 'data/tex/dog.png');
+		game.load.image('ground', 'data/tex/ground.jpg');
+		game.load.spritesheet('monster', 'data/tex/monster2-sheet.png', 64, 64);
+		game.load.spritesheet('civilian', 'data/tex/civilian-sheet.png', 32, 32);
+		game.load.spritesheet('policeman', 'data/tex/policeman-sheet.png', 32, 32);
+
 		game.load.image('tiles', 'data/tex/tiles.png');
-		game.load.image('grass', 'data/tex/grass.jpg');
-		game.load.image('vision', 'data/tex/vision.jpg');
-		game.load.image('scare', 'data/tex/pebble.png');
-		game.load.image('friend', 'data/tex/drop.png');
+		game.load.image('vision', 'data/tex/light-cone.jpg');
+		game.load.image('scare', 'data/tex/exclamation.png');
+		game.load.image('friend', 'data/tex/heart.png');
 		game.load.tilemap('level', 'data/level/level.json', null, Phaser.Tilemap.TILED_JSON);
 
 		game.load.start();
@@ -88,6 +92,7 @@ class App
 		//game.input.keyboard.onPressCallback = () => this.handleKeyPress();
 
 		game.time.advancedTiming = true;
+		this.chatterEvent = null;
     }
 
 	//------------------------------------------------------------------------------
@@ -128,6 +133,8 @@ class App
 		this.isAwaitingRestart = false;
 		this.shoutHeld = false;
 		this.shouted = false;
+		this.hugHeld = false;
+		this.scheduleChatter();
 	}
 
 	//------------------------------------------------------------------------------
@@ -135,6 +142,11 @@ class App
 	{
 		console.log("Game reset");
 
+		if (this.chatterEvent)
+		{
+			game.time.events.remove(this.chatterEvent);
+			this.chatterEvent = null;
+		}
 		level.destroy();
 		guardGroup.destroy();
 		civilianGroup.destroy();
@@ -152,9 +164,9 @@ class App
 		if (lastKey && lastKey.justDown)
 			this.handleKeyPress();
 
-		// Shout control
 		if (this.isRunning)
 		{
+			// Shout control
 			var shoutHeld = !!keyboard.isDown(Phaser.Keyboard.SPACEBAR);
 			var shouldShout = false;
 			if (shoutHeld != this.shoutHeld)
@@ -176,6 +188,19 @@ class App
 			{
 				player.shout(Math.min(game.time.now - this.shoutHoldStart, Player.SHOUT_HOLD_LIMIT_MS));
 				this.shouted = true;
+			}
+
+			// Hug control
+			var hugHeld = !!keyboard.isDown(Phaser.Keyboard.CONTROL);
+			if (hugHeld != this.hugHeld)
+			{
+				// Start hugging anything unaware in range
+				if (hugHeld)
+					player.startHug();
+				else
+					player.stopHug();
+
+				this.hugHeld = hugHeld;
 			}
 		}
 	}
@@ -301,6 +326,34 @@ class App
 			subheaderText.innerHTML = "Dead!";
 			this.setStatus("Press Enter to restart");
 		}
+	}
+
+	//------------------------------------------------------------------------------
+	private scheduleChatter()
+	{
+		var intervalMs = Phaser.Math.linear(300, 8000, Math.random());
+		this.chatterEvent = game.time.events.add(intervalMs, () => this.triggerChatter());
+	}
+
+	//------------------------------------------------------------------------------
+	private triggerChatter()
+	{
+		// Pick a guard or civilian
+		var chatterers: Entity[] = [];
+		var findChatterers = sprite =>
+		{
+			var entity = (<IEntitySprite>sprite).entity;
+			if (entity.canChatter())
+				chatterers.push(entity);
+		}
+		guardGroup.forEachAlive(findChatterers, null);
+		civilianGroup.forEachAlive(findChatterers, null);
+		if (chatterers.length <= 0)
+			return;
+
+		Utils.getRandomElementFrom(chatterers).triggerChatter();
+
+		this.scheduleChatter();		// next event
 	}
 }
 
