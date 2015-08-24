@@ -10,6 +10,7 @@ var TILE_GUARD = 3;
 var TILE_WALL = 1;
 var TILE_CIVILIAN = 7;
 var TILE_PATH = 2;
+var TILE_PLANT = 10;
 
 class Level
 {
@@ -17,16 +18,16 @@ class Level
 	public layer: Phaser.TilemapLayer;
 	private ground: Phaser.TileSprite;
 
-	constructor(mapName: string, tilesetName: string)
+	constructor(mapName: string, tilesetName: string, layerName: string)
 	{
 		this.ground = game.add.tileSprite(0, 0, game.world.width, game.world.height, 'ground');
 		this.ground.tint = 0x808080;
 
 		this.tilemap = game.add.tilemap(mapName);
 		this.tilemap.addTilesetImage(tilesetName);
-		this.tilemap.setCollision(TILE_WALL);
-		this.layer = this.tilemap.createLayer("Tile Layer 1");
-		this.layer.debug = true;
+		this.tilemap.setCollision([TILE_WALL, TILE_PLANT]);
+		this.layer = this.tilemap.createLayer(layerName);
+		//this.layer.debug = true;
 
 		// Player
 		var tempGroup: Phaser.Group = game.add.group();

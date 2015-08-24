@@ -19,7 +19,7 @@ var level: Level = null;
 var TILE_SIZE: number = 32;
 var NUM_TILES_X: number = 32;
 var NUM_TILES_Y: number = 20;
-var INITIAL_HEALTH: number = 50;
+var INITIAL_HEALTH: number = 10;
 
 //------------------------------------------------------------------------------
 // Main app
@@ -40,6 +40,7 @@ class App
 	private hugHoldStart: number;
 	private chatterEvent: Phaser.TimerEvent;
 	private music: Phaser.Sound;
+	private nextLevel: string;
 
 	//------------------------------------------------------------------------------
     constructor()
@@ -99,7 +100,7 @@ class App
 	{
 		// Stop various key presses from passing through to the browser
 		var kb = Phaser.Keyboard;
-		game.input.keyboard.addKeyCapture([kb.LEFT, kb.RIGHT, kb.UP, kb.DOWN, kb.SPACEBAR, kb.ENTER, kb.BACKSPACE, kb.P]);
+		game.input.keyboard.addKeyCapture([kb.LEFT, kb.RIGHT, kb.UP, kb.DOWN, kb.SPACEBAR, kb.ENTER, kb.BACKSPACE, kb.P, kb.CONTROL]);
 
 		game.physics.startSystem(Phaser.Physics.ARCADE);
 
@@ -113,6 +114,7 @@ class App
 		game.time.advancedTiming = true;
 		this.chatterEvent = null;
 		this.music = null;
+		this.nextLevel = "level1";
     }
 
 	//------------------------------------------------------------------------------
@@ -143,7 +145,7 @@ class App
 	{
 		console.log("Game starting");
 
-		level = new Level('level', 'tiles');
+		level = new Level('level', 'tiles', this.nextLevel);
 
 		this.setScarePoints(0);
 		this.setFriendPoints(0);
@@ -155,11 +157,15 @@ class App
 		this.shouted = false;
 		this.hugHeld = false;
 		this.scheduleChatter();
+		this.setStatus("");
+		subheaderText.innerHTML = "";
 
 		if (this.music)
 			this.music.destroy();
 		this.music = game.add.audio('music', 0.6, true);
 		this.music.play();
+
+		Utils.trackStat('game', 'start');
 	}
 
 	//------------------------------------------------------------------------------
@@ -296,7 +302,7 @@ class App
 		//guardGroup.forEachAlive(child => { if (child.body.enable) game.debug.body(child); }, null);
 		//civilianGroup.forEachAlive(child => { if (child.body.enable) game.debug.body(child); }, null);
 		//game.debug.bodyInfo(player.sprite, 10, 20);
-		game.debug.bodyInfo(<Phaser.Sprite>guardGroup.children[1], 10, 20);
+		//game.debug.bodyInfo(<Phaser.Sprite>guardGroup.children[1], 10, 20);
 	}
 
 	//------------------------------------------------------------------------------
@@ -309,6 +315,7 @@ class App
 	public addScarePoints(num: number)
 	{
 		this.setScarePoints(this.scarePoints + num);
+		Utils.trackStat('points', 'scare', '', this.friendPoints);
 	}
 
 	//------------------------------------------------------------------------------
@@ -322,6 +329,7 @@ class App
 	public addFriendPoints(num: number)
 	{
 		this.setFriendPoints(this.friendPoints + num);
+		Utils.trackStat('points', 'friend', '', this.friendPoints);
 	}
 
 	//------------------------------------------------------------------------------
@@ -353,7 +361,27 @@ class App
 			this.isAwaitingRestart = true;
 			subheaderText.innerHTML = "Dead!";
 			this.setStatus("Press Enter to restart");
+			Utils.trackStat('game', 'death');
 		}
+	}
+
+	//------------------------------------------------------------------------------
+	public checkCompletion()
+	{
+		if (guardGroup.children.length === 0 && civilianGroup.children.length === 0)
+			this.winLevel();
+	}
+
+	//------------------------------------------------------------------------------
+	public winLevel()
+	{
+		this.isRunning = false;
+		this.isAwaitingRestart = true;
+		subheaderText.innerHTML = "You won!";
+		this.setStatus("Press Enter to try the next level");
+		this.nextLevel = (this.nextLevel === 'level1') ? 'level2' : 'level1';
+			
+		Utils.trackStat('level', 'won');
 	}
 
 	//------------------------------------------------------------------------------

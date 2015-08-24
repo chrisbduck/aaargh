@@ -29,7 +29,7 @@ class Player extends Entity
 	//------------------------------------------------------------------------------
 	constructor(sprite: Phaser.Sprite)
 	{
-		super(sprite, "player");
+		super(sprite, "player", 0, 0.5);
 		this.cursorKeys = game.input.keyboard.createCursorKeys();
 		this.prevVel = new Phaser.Point();
 		this.canMove = true;
@@ -49,6 +49,7 @@ class Player extends Entity
 		body.bounce.x = 0.2;
 		body.bounce.y = 0.2;
 		body.collideWorldBounds = true;
+		body.setSize(48, 64);
 
 		var anims = this.sprite.animations;
 		var animSpeed = Player.WALK_ANIM_SPEED;
@@ -56,7 +57,6 @@ class Player extends Entity
 		anims.add('up', [4, 5, 6, 5], animSpeed, true);
 		anims.add('left', [8, 9, 10, 9], animSpeed, true);
 		anims.add('right', [12, 13, 14, 13], animSpeed, true);
-		this.sprite.scale.set(0.5, 0.5);
 	}
 
 	//------------------------------------------------------------------------------
@@ -172,13 +172,13 @@ class Player extends Entity
 	}
 
 	//------------------------------------------------------------------------------
-	public startHug()
+	public startHug(): boolean
 	{
 		var hugHandler = (entitySprite: IEntitySprite) =>
 		{
 			var entity = entitySprite.entity;
 			if (Utils.distSqBetweenPoints(entity.sprite.position, this.sprite.position) > Player.MAX_HUG_DIST_SQ)
-				return;
+				return false;
 
 			console.log(entity.debugName, "in hug range;", entity.canBeHugged() ? "huggable" : "not huggable");
 			if (entity.canBeHugged())
@@ -192,6 +192,7 @@ class Player extends Entity
 		this.isHugging = true;
 		this.hugEmitter = new HugEmitter(this.sprite.position.x, this.sprite.position.y);
 		Utils.playSound('hugstart', 1, 4);
+		return true;
 	}
 
 	//------------------------------------------------------------------------------

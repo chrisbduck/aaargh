@@ -26,11 +26,8 @@
     <Content Include="app.css" />
     <Content Include="data\tex\civilian-sheet.png" />
     <Content Include="data\tex\civilian.png" />
-    <Content Include="data\tex\dog.png" />
-    <Content Include="data\tex\drop.png" />
     <Content Include="data\tex\exclamation-white.png" />
     <Content Include="data\tex\exclamation.png" />
-    <Content Include="data\tex\grass.jpg" />
     <Content Include="data\tex\ground.jpg" />
     <Content Include="data\tex\heart.png" />
     <Content Include="data\tex\light-circle.png" />

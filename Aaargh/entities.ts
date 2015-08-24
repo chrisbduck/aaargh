@@ -62,11 +62,12 @@ class Entity
 	protected static SCARED_QUOTES: string[] = ["Aaargh!", "Aargh!", "Aaaaaaargh!", "Help!", "Yikes!", "Urk!", "Waaaa!"];
 
 	//------------------------------------------------------------------------------
-	constructor(sprite: Phaser.Sprite, typeName: string, watchingDistance: number = 0)
+	constructor(sprite: Phaser.Sprite, typeName: string, watchingDistance: number = 0, scale: number = 1)
 	{
 		this.sprite = sprite;
 		this.sprite.anchor.set(0.5, 0.5);
-		this.sprite.position.add(this.sprite.width * 0.5, this.sprite.height * 0.5);
+		this.sprite.scale.set(scale, scale);
+		this.sprite.position.add(this.sprite.width * scale * 0.5, this.sprite.height * scale * 0.5);
 		this.body = sprite.body;
 		(<IEntitySprite>sprite).entity = this;
 		this.saying = null;
@@ -336,7 +337,11 @@ class Entity
 		app.addFriendPoints(this.hugScore);
 		this.sprite.tint = 0xFF8080;
 		game.add.tween(this.sprite).to({ alpha: 0 }, 1000, Phaser.Easing.Linear.None, true);
-		game.time.events.add(1000, () => this.sprite.destroy());
+		game.time.events.add(1000, () =>
+		{
+			this.sprite.destroy();
+			app.checkCompletion();
+		});
 		this.stopWatching();
 		this.sprite.alive = false;
 		new FriendEmitter(this.sprite.x, this.sprite.y, this.hugScore * 3);
@@ -369,6 +374,14 @@ class Entity
 	{
 		return this.sprite.alive && !this.isBeingHugged;
 	}
+
+	//------------------------------------------------------------------------------
+	protected handleEscaped()
+	{
+		this.sprite.destroy();
+		app.checkCompletion();
+	}
+
 }
 
 //------------------------------------------------------------------------------
@@ -428,8 +441,11 @@ class Guard extends Entity
 	constructor(sprite: Phaser.Sprite)
 	{
 		super(sprite, "guard", Guard.MAX_SIGHT_RANGE);
+		this.sprite.checkWorldBounds = true;
+		this.sprite.events.onOutOfBounds.add(() => this.handleEscaped());
 		this.body.maxVelocity.setTo(Guard.CHASE_SPEED, Guard.CHASE_SPEED);
 		this.body.drag.setTo(Guard.DRAG, Guard.DRAG);
+		this.body.setSize(28, 32);
 		this.movePaused = false;
 		this.state = Guard.STATE_STANDING;
 		this.spottedPlayerTimer = null;
@@ -766,6 +782,7 @@ class Civilian extends Entity
 	{
 		super(sprite, "civilian", Civilian.MAX_SIGHT_RANGE);
 		this.body.drag.setTo(Civilian.DRAG, Civilian.DRAG);
+		this.body.setSize(28, 32);
 		this.sprite.checkWorldBounds = true;
 		this.sprite.events.onOutOfBounds.add(() => this.handleEscaped());
 		this.isFleeing = false;
@@ -854,13 +871,6 @@ class Civilian extends Entity
 				this.isFleeing = true;
 				this.scaledScare(10, magnitudeSq, Civilian.SCARE_THRESHOLD_SQ);
 			});
-	}
-
-	//------------------------------------------------------------------------------
-	private handleEscaped()
-	{
-		console.log(this.debugName, "escaped");
-		this.sprite.destroy();
 	}
 
 	//------------------------------------------------------------------------------
