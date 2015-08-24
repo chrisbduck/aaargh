@@ -64,6 +64,8 @@ class Player extends Entity
 	{
 		this.updateMoveInput();
 
+		game.physics.arcade.collide(this.sprite, plantGroup);
+
 		// Anim frame override
 		if (this.isShouting)
 			this.sprite.frame = this.shoutFrame;

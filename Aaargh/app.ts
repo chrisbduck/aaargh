@@ -68,6 +68,7 @@ class App
 		game.load.spritesheet('civilian', 'data/tex/civilian-sheet.png', 32, 32);
 		game.load.spritesheet('policeman', 'data/tex/policeman-sheet.png', 32, 32);
 
+		game.load.image('plant', 'data/tex/plant.png');
 		game.load.image('tiles', 'data/tex/tiles.png');
 		game.load.image('vision', 'data/tex/light-cone.png');
 		game.load.image('scare', 'data/tex/exclamation.png');
@@ -114,7 +115,7 @@ class App
 		game.time.advancedTiming = true;
 		this.chatterEvent = null;
 		this.music = null;
-		this.nextLevel = "level1";
+		this.nextLevel = 'level1';
     }
 
 	//------------------------------------------------------------------------------
@@ -181,6 +182,7 @@ class App
 		level.destroy();
 		guardGroup.destroy();
 		civilianGroup.destroy();
+		plantGroup.destroy();
 		this.startGame();
 	}
 
@@ -207,6 +209,7 @@ class App
 					this.shoutHoldStart = game.time.now;
 					this.shouted = false;
 					player.prepareShout();
+					Utils.trackStat('player', 'shout');
 				}
 				else
 					shouldShout = true;
@@ -227,7 +230,10 @@ class App
 			{
 				// Start hugging anything unaware in range
 				if (hugHeld)
+				{
 					player.startHug();
+					Utils.trackStat('player', 'hug');
+				}
 				else
 					player.stopHug();
 
@@ -270,11 +276,13 @@ class App
 		// Guards
 		physics.collide(guardGroup, guardGroup);
 		physics.collide(guardGroup, civilianGroup);
+		physics.collide(guardGroup, plantGroup);
 		this.updateGroup(guardGroup, false);
 
 		// Civilians
 		this.updateGroup(civilianGroup, false);
 		physics.collide(civilianGroup, civilianGroup);
+		physics.collide(civilianGroup, plantGroup);
 
 		level.update();
 	}

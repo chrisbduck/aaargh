@@ -12,6 +12,8 @@ var TILE_CIVILIAN = 7;
 var TILE_PATH = 2;
 var TILE_PLANT = 10;
 
+var plantGroup: Phaser.Group = null;
+
 class Level
 {
 	private tilemap: Phaser.Tilemap;
@@ -25,7 +27,8 @@ class Level
 
 		this.tilemap = game.add.tilemap(mapName);
 		this.tilemap.addTilesetImage(tilesetName);
-		this.tilemap.setCollision([TILE_WALL, TILE_PLANT]);
+		//this.tilemap.setCollision([TILE_WALL, TILE_PLANT]);
+		this.tilemap.setCollision(TILE_WALL);
 		this.layer = this.tilemap.createLayer(layerName);
 		//this.layer.debug = true;
 
@@ -41,16 +44,26 @@ class Level
 		// Guards
 		guardGroup = game.add.group(undefined, 'guards');
 		guardGroup.enableBody = true;
-		guardGroup.enableBodyDebug = true;
+		//guardGroup.enableBodyDebug = true;
 		this.tilemap.createFromTiles(TILE_GUARD, -1, 'policeman', this.layer, guardGroup);
 		guardGroup.forEach(child => new Guard(child), null);
 
 		// Civilians
 		civilianGroup = game.add.group(undefined, 'civilians');
 		civilianGroup.enableBody = true;
-		civilianGroup.enableBodyDebug = true;
+		//civilianGroup.enableBodyDebug = true;
 		this.tilemap.createFromTiles(TILE_CIVILIAN, -1, 'civilian', this.layer, civilianGroup);
 		civilianGroup.forEach(child => new Civilian(child), null);
+
+		// Plants
+		plantGroup = game.add.group(undefined, 'plants');
+		plantGroup.enableBody = true;
+		this.tilemap.createFromTiles(TILE_PLANT, -1, 'plant', this.layer, plantGroup);
+		plantGroup.forEach((sprite: Phaser.Sprite) =>
+		{
+			var body: Phaser.Physics.Arcade.Body = sprite.body;
+			body.drag.set(500, 500);
+		}, null);
 	}
 
 	//------------------------------------------------------------------------------
@@ -60,6 +73,7 @@ class Level
 		physics.collide(player.sprite, this.layer);
 		//physics.collide(guardGroup, this.layer);
 		physics.collide(civilianGroup, this.layer);
+		physics.collide(plantGroup, this.layer);
 	}
 
 	//------------------------------------------------------------------------------

@@ -8,11 +8,15 @@
 #statsCol {
 	width: 256px;
 	height: 640px;
-	float: left;
+	position: absolute;
+	left: 0px;
+	top: 0px;
 }
 
 #contentCol {
-	float: left;
+	position: absolute;
+	left: 256px;
+	top: 0px;
 }
 
 #content {

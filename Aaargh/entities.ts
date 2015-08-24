@@ -170,7 +170,15 @@ class Entity
 		if (level.getTilesBetweenPoints(thisPos, playerPos).length > 0)
 			return false;
 
-		return true;
+		// Check if obscured by plants
+		var result = true;
+		plantGroup.forEach(sprite =>
+		{
+			if (Utils.lineIntersectsSprite(playerPos, thisPos, sprite))
+				result = false;
+		}, null);
+
+		return result;
 	}
 
 	//------------------------------------------------------------------------------

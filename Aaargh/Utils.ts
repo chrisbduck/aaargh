@@ -132,4 +132,34 @@ class Utils
 	{
 		sprite.rotation = targetAngle - imageAngle;
 	}
+
+	//------------------------------------------------------------------------------
+	public static lineIntersectsLineBetweenPoints(line: Phaser.Line, otherPoint1: Phaser.Point, otherPoint2: Phaser.Point): boolean
+	{
+		var otherLine = new Phaser.Line(otherPoint1.x, otherPoint1.y, otherPoint2.x, otherPoint2.y);
+		var x = line.intersects(otherLine);
+		return x != null;
+	}
+
+	//------------------------------------------------------------------------------
+	public static lineIntersectsSprite(linePoint1: Phaser.Point, linePoint2: Phaser.Point, sprite: Phaser.Sprite): boolean
+	{
+		var line = new Phaser.Line(linePoint1.x, linePoint1.y, linePoint2.x, linePoint2.y);
+
+		var body: Phaser.Physics.Arcade.Body = sprite.body;
+		var bodyTL = new Phaser.Point(body.x, body.y);
+		var bodyTR = new Phaser.Point(body.x + body.width, body.y);
+		var bodyBL = new Phaser.Point(body.x, body.y + body.halfHeight * 2);
+		var bodyBR = new Phaser.Point(body.x + body.width, body.y + body.halfHeight * 2);
+		//var bodyTL = new Phaser.Point(sprite.position.x, sprite.position.y);
+		//var bodyTR = new Phaser.Point(sprite.position.x + sprite.width, sprite.position.y);
+		//var bodyBL = new Phaser.Point(sprite.position.x, sprite.position.y + sprite.height);
+		//var bodyBR = new Phaser.Point(sprite.position.x + sprite.width, sprite.position.y + sprite.height);
+		if (Utils.lineIntersectsLineBetweenPoints(line, bodyTL, bodyTR)) return true;
+		if (Utils.lineIntersectsLineBetweenPoints(line, bodyTL, bodyBL)) return true;
+		if (Utils.lineIntersectsLineBetweenPoints(line, bodyTR, bodyBR)) return true;
+		if (Utils.lineIntersectsLineBetweenPoints(line, bodyBL, bodyBR)) return true;
+
+		return false;
+	}
 }
