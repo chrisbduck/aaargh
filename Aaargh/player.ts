@@ -8,12 +8,12 @@ var player: Player = null;
 
 class Player extends Entity
 {
-	static NORMAL_VEL = 200;
+	static NORMAL_VEL = 400;
 	static DIAG_FACTOR = 0.7071;
-	static ACCELERATION = 2000;
-	static DRAG = 1000;
+	static ACCELERATION = 4000;
+	static DRAG = 2000;
 	static SHOUT_HOLD_LIMIT_MS = 1000;
-	static MAX_HUG_DIST = 50;
+	static MAX_HUG_DIST = 100;
 	static MAX_HUG_DIST_SQ = Player.MAX_HUG_DIST * Player.MAX_HUG_DIST;
 	static WALK_ANIM_SPEED = 10;
 
@@ -29,7 +29,7 @@ class Player extends Entity
 	//------------------------------------------------------------------------------
 	constructor(sprite: Phaser.Sprite)
 	{
-		super(sprite, "player", 0, 0.5);
+		super(sprite, "player");
 		this.cursorKeys = game.input.keyboard.createCursorKeys();
 		this.prevVel = new Phaser.Point();
 		this.canMove = true;
@@ -44,12 +44,13 @@ class Player extends Entity
 		game.physics.arcade.enable(this.sprite);
 
 		var body: Phaser.Physics.Arcade.Body = this.sprite.body;
+		this.body = body;												// not set correctly until physics enable above
 		body.maxVelocity.setTo(Player.NORMAL_VEL, Player.NORMAL_VEL);
 		body.drag.setTo(Player.DRAG, Player.DRAG);
 		body.bounce.x = 0.2;
 		body.bounce.y = 0.2;
 		body.collideWorldBounds = true;
-		body.setSize(48, 64);
+		body.setSize(48, 64, 8, 0);
 
 		var anims = this.sprite.animations;
 		var animSpeed = Player.WALK_ANIM_SPEED;
@@ -182,7 +183,6 @@ class Player extends Entity
 			if (Utils.distSqBetweenPoints(entity.sprite.position, this.sprite.position) > Player.MAX_HUG_DIST_SQ)
 				return false;
 
-			console.log(entity.debugName, "in hug range;", entity.canBeHugged() ? "huggable" : "not huggable");
 			if (entity.canBeHugged())
 			{
 				entity.startHug();
@@ -192,8 +192,12 @@ class Player extends Entity
 		guardGroup.forEachAlive(hugHandler, null);
 		civilianGroup.forEachAlive(hugHandler, null);
 		this.isHugging = true;
-		this.hugEmitter = new HugEmitter(this.sprite.position.x, this.sprite.position.y);
 		Utils.playSound('hugstart', 1, 4);
+		if (this.hugTargets && this.hugTargets.length > 0)
+		{
+			this.hugEmitter = new HugEmitter(this.sprite.position.x, this.sprite.position.y);
+			this.say("<hug>", true);		// held
+		}
 		return true;
 	}
 
@@ -203,11 +207,22 @@ class Player extends Entity
 		for (var index = 0; index < this.hugTargets.length; ++index)
 			this.hugTargets[index].releaseHug();
 		this.hugTargets = [];
+		this.say("");
 		this.isHugging = false;
 
 		var emitter = this.hugEmitter;
 		this.hugEmitter = null;
-		emitter.stop();
-		game.time.events.add(2000, () => emitter.destroy());
+		if (emitter)
+		{
+			emitter.stop();
+			game.time.events.add(2000, () => emitter.destroy());
+		}
+	}
+
+	//------------------------------------------------------------------------------
+	public halt()
+	{
+		this.body.acceleration.set(0, 0);
+		this.body.velocity.set(0, 0);
 	}
 }

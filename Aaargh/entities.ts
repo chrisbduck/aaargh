@@ -33,10 +33,10 @@ class Entity
 {
 	static SAY_TIME_MS = 1000;
 	static SAY_FADE_TIME_MS = 500;
-	static SAY_SIZE_PX = 18;
-	static MAX_UNSCALED_SCARE = 32;
+	static SAY_SIZE_PX = 28;
+	static MAX_UNSCALED_SCARE = 64;
 	static MIN_UNSCALED_SCARE_SQ = Entity.MAX_UNSCALED_SCARE * Entity.MAX_UNSCALED_SCARE;
-	static CLOSE_DIST = 12;
+	static CLOSE_DIST = 24;
 	static CLOSE_DIST_SQ = Entity.CLOSE_DIST * Entity.CLOSE_DIST;
 
 	public sprite: Phaser.Sprite;
@@ -67,7 +67,9 @@ class Entity
 		this.sprite = sprite;
 		this.sprite.anchor.set(0.5, 0.5);
 		this.sprite.scale.set(scale, scale);
-		this.sprite.position.add(this.sprite.width * scale * 0.5, this.sprite.height * scale * 0.5);
+		var x = (this.sprite.position.x + this.sprite.width * 0.5) * scale;
+		var y = (this.sprite.position.y + this.sprite.height * 0.5) * scale;
+		this.sprite.position.set(x, y);
 		this.body = sprite.body;
 		(<IEntitySprite>sprite).entity = this;
 		this.saying = null;
@@ -114,7 +116,11 @@ class Entity
 				game.time.events.remove(this.sayingEvent);
 				this.sayingEvent = null;
 			}
+			this.saying = null;
 		}
+
+		if (!text)
+			return;
 		
 		var fontSize = Math.round(Entity.SAY_SIZE_PX * scale);
 		this.textStyle['font'] = fontSize + "px 'Comic Sans',cursive";
@@ -127,7 +133,7 @@ class Entity
 		if (!held)
 		{
 			game.add.tween(this.saying.scale).to({ 'x': 0, 'y': 0 }, Entity.SAY_FADE_TIME_MS, Phaser.Easing.Quadratic.Out, true, sayTimeMs);
-			this.sayingEvent = game.time.events.add(sayTimeMs + Entity.SAY_FADE_TIME_MS, () => this.saying.destroy());
+			this.sayingEvent = game.time.events.add(sayTimeMs + Entity.SAY_FADE_TIME_MS, () => { this.saying.destroy(); this.saying = null; });
 		}
 		this.updateSayTextPosition();
 	}
@@ -139,7 +145,6 @@ class Entity
 		if (loudness !== 1)
 			offset.divide(loudness, loudness);
 		var magnitudeSq = offset.getMagnitudeSq();
-		//console.log(this.debugName, "handling noise msq", magnitudeSq);
 		this.handleNoiseMagnitudeSq(magnitudeSq, position);
 	}
 
@@ -156,8 +161,6 @@ class Entity
 		var thisPos = this.sprite.position;
 		var offsetToPlayer = new Phaser.Point(playerPos.x, playerPos.y).subtract(thisPos.x, thisPos.y);
 		var distSqToPlayer = offsetToPlayer.getMagnitudeSq();
-		//if (this.debugName == 'guard1')
-			//console.log("vision dist", distSqToPlayer, "dot", this.facingDir.dot(offsetToPlayer));
 		if (distSqToPlayer > maxSightRangeSq)
 			return false;
 
@@ -204,8 +207,6 @@ class Entity
 			this.facingDir = new Phaser.Point(vector.x, vector.y).normalize();
 			this.facingAngle = Phaser.Math.angleBetween(0, 0, this.facingDir.x, this.facingDir.y);
 		}
-		//if (this.debugName == 'guard1')
-			//console.log("guard1 facing", this.facingDir);
 	}
 
 	//------------------------------------------------------------------------------
@@ -380,7 +381,8 @@ class Entity
 	//------------------------------------------------------------------------------
 	public canChatter(): boolean
 	{
-		return this.sprite.alive && !this.isBeingHugged;
+		return this.sprite.alive && !this.isBeingHugged && !this.saying && game.camera.view.intersects(
+			new Phaser.Rectangle(this.sprite.x, this.sprite.y, this.sprite.width, this.sprite.height), 0);
 	}
 
 	//------------------------------------------------------------------------------
@@ -400,20 +402,20 @@ var guardGroup: Phaser.Group;
 
 class Guard extends Entity
 {
-	static PATROL_SPEED = 100;
-	static CHASE_SPEED = 180;
-	static FLEE_SPEED = 180;
-	static ACCELERATION = 1800;
-	static DRAG = 1200;
+	static PATROL_SPEED = 200;
+	static CHASE_SPEED = 360;
+	static FLEE_SPEED = 360;
+	static ACCELERATION = 3600;
+	static DRAG = 2400;
 	static HIT_PAUSE_MS = 1000;
 	static BEFORE_SAW_PLAYER_PAUSE_MS = 300;
 	static AFTER_SAW_PLAYER_PAUSE_MS = 1000;
 	static MIN_SIGHT_ANGLE_RATIO = 0.7071;		// max 45 degrees from straight on
-	static MAX_SIGHT_RANGE = 200;
+	static MAX_SIGHT_RANGE = 400;
 	static MAX_SIGHT_RANGE_SQ = Guard.MAX_SIGHT_RANGE * Guard.MAX_SIGHT_RANGE;
-	static SCARE_THRESHOLD = 64;
+	static SCARE_THRESHOLD = 128;
 	static SCARE_THRESHOLD_SQ = Guard.SCARE_THRESHOLD * Guard.SCARE_THRESHOLD;
-	static ALERT_THRESHOLD = 128;
+	static ALERT_THRESHOLD = 256;
 	static ALERT_THRESHOLD_SQ = Guard.ALERT_THRESHOLD * Guard.ALERT_THRESHOLD;
 	static ALERT_PAUSE_MS = 800;
 	static LOST_PLAYER_GIVE_UP_MS = 4000;
@@ -453,7 +455,7 @@ class Guard extends Entity
 		this.sprite.events.onOutOfBounds.add(() => this.handleEscaped());
 		this.body.maxVelocity.setTo(Guard.CHASE_SPEED, Guard.CHASE_SPEED);
 		this.body.drag.setTo(Guard.DRAG, Guard.DRAG);
-		this.body.setSize(28, 32);
+		this.body.setSize(56, 64, 4, 0);
 		this.movePaused = false;
 		this.state = Guard.STATE_STANDING;
 		this.spottedPlayerTimer = null;
@@ -485,8 +487,7 @@ class Guard extends Entity
 		if (this.patrolRoute === null)
 		{
 			this.patrolRoute = level.getPatrolRouteStartingAt(this.sprite.position);
-			if (this.patrolRoute.length > 0)
-				this.patrolToPointIndex(0);
+			this.patrolToPointIndex(0);
 		}
 
 		var physics = game.physics.arcade;
@@ -640,6 +641,12 @@ class Guard extends Entity
 	//------------------------------------------------------------------------------
 	private patrolToPointIndex(firstPoint: number = null)
 	{
+		if (this.patrolRoute.length <= 0)
+		{
+			this.state = Guard.STATE_STANDING;
+			return;
+		}
+
 		if (firstPoint != null)
 			this.nextPatrolPointIndex = (firstPoint >= this.patrolRoute.length) ? 0 : firstPoint;
 
@@ -763,18 +770,18 @@ var civilianGroup: Phaser.Group;
 
 class Civilian extends Entity
 {
-	static DRAG = 600;
-	static FLEE_SPEED = 220;
-	static SCARE_THRESHOLD = 100;
+	static DRAG = 1200;
+	static FLEE_SPEED = 440;
+	static SCARE_THRESHOLD = 200;
 	static SCARE_THRESHOLD_SQ = Civilian.SCARE_THRESHOLD * Civilian.SCARE_THRESHOLD;
-	static MAX_SIGHT_RANGE = 120;
+	static MAX_SIGHT_RANGE = 240;
 	static MIN_SIGHT_ANGLE_RATIO = 0.866;		// max 30 degrees from straight on
 	static MAX_SIGHT_RANGE_SQ = Civilian.MAX_SIGHT_RANGE * Civilian.MAX_SIGHT_RANGE;
-	static NORMAL_SPEED = 110;
+	static NORMAL_SPEED = 220;
 	static WANDER_MIN_INTERVAL_MS = 1000;
 	static WANDER_MAX_INTERVAL_MS = 7000;
-	static WANDER_MIN_DIST = 24;
-	static WANDER_MAX_DIST = 80;
+	static WANDER_MIN_DIST = 48;
+	static WANDER_MAX_DIST = 160;
 	static WALK_ANIM_SPEED = 10;
 	static AMBIENT_CHATTER = ["La la la...", "Dooby doo...", "What a lovely day!", "No scary monsters here!", "<cough>", "<sneeze>", "<sigh>",
 		"<whistles>", "Zip-a-dee-doo-dah...", "I'm hungry.", "<snort>", "Ba ba ba...", "Dee dee dee...", "Hmmm... dair... dah-ray?",
@@ -790,13 +797,12 @@ class Civilian extends Entity
 	{
 		super(sprite, "civilian", Civilian.MAX_SIGHT_RANGE);
 		this.body.drag.setTo(Civilian.DRAG, Civilian.DRAG);
-		this.body.setSize(28, 32);
+		this.body.setSize(56, 64, 4, 0);
 		this.sprite.checkWorldBounds = true;
 		this.sprite.events.onOutOfBounds.add(() => this.handleEscaped());
 		this.isFleeing = false;
 		this.walkSpeed = Civilian.NORMAL_SPEED;
 		this.textStyle['fill'] = Utils.getRandomElementFrom(["aqua", "aquamarine", "cadetblue", "cyan", "darkgoldenrod", "goldenrod", "lightskyblue"]);
-		//console.log(this.debugName, this.textStyle['fill']);
 		this.nextWander = null;
 		this.target = null;
 		this.hugDuration = 2000;

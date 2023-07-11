@@ -16,10 +16,12 @@ var healthText: HTMLSpanElement = null;
 var subheaderText: HTMLSpanElement = null;
 var level: Level = null;
 
-var TILE_SIZE: number = 32;
+var TILE_SIZE: number = 64;
 var NUM_TILES_X: number = 32;
 var NUM_TILES_Y: number = 20;
 var INITIAL_HEALTH: number = 10;
+var DISPLAY_TILES_X: number = 16;
+var DISPLAY_TILES_Y: number = 10;
 
 //------------------------------------------------------------------------------
 // Main app
@@ -45,7 +47,7 @@ class App
 	//------------------------------------------------------------------------------
     constructor()
 	{
-        game = new Phaser.Game(NUM_TILES_X * TILE_SIZE, NUM_TILES_Y * TILE_SIZE, Phaser.AUTO, 'content',
+        game = new Phaser.Game(DISPLAY_TILES_X * TILE_SIZE, DISPLAY_TILES_Y * TILE_SIZE, Phaser.AUTO, 'content',
 			{ preload: () => this.preload(), create: () => this.create(), update: () => this.update(), render: () => this.render() });
 
 		statusText = document.getElementById("status");
@@ -65,15 +67,15 @@ class App
 	{
 		game.load.image('ground', 'data/tex/ground.jpg');
 		game.load.spritesheet('monster', 'data/tex/monster2-sheet.png', 64, 64);
-		game.load.spritesheet('civilian', 'data/tex/civilian-sheet.png', 32, 32);
-		game.load.spritesheet('policeman', 'data/tex/policeman-sheet.png', 32, 32);
+		game.load.spritesheet('civilian', 'data/tex/bigcivilian-sheet.png', 64, 64);
+		game.load.spritesheet('policeman', 'data/tex/bigpoliceman-sheet.png', 64, 64);
 
-		game.load.image('plant', 'data/tex/plant.png');
-		game.load.image('tiles', 'data/tex/tiles.png');
+		game.load.image('plant', 'data/tex/bigplant.png');
+		game.load.image('bigtiles', 'data/tex/bigtiles.png');
 		game.load.image('vision', 'data/tex/light-cone.png');
 		game.load.image('scare', 'data/tex/exclamation.png');
 		game.load.image('friend', 'data/tex/heart.png');
-		game.load.tilemap('level', 'data/level/level.json', null, Phaser.Tilemap.TILED_JSON);
+		game.load.tilemap('biglevel', 'data/level/biglevel.json', null, Phaser.Tilemap.TILED_JSON);
 
 		var SOUND_EFFECTS = [
 			'hit1', 'hit2', 'hit3', 'hit4',
@@ -103,7 +105,11 @@ class App
 		var kb = Phaser.Keyboard;
 		game.input.keyboard.addKeyCapture([kb.LEFT, kb.RIGHT, kb.UP, kb.DOWN, kb.SPACEBAR, kb.ENTER, kb.BACKSPACE, kb.P, kb.CONTROL]);
 
+		game.world.setBounds(0, 0, NUM_TILES_X * TILE_SIZE, NUM_TILES_Y * TILE_SIZE);
+
 		game.physics.startSystem(Phaser.Physics.ARCADE);
+
+		this.nextLevel = 'level1';
 
 		game.load.onLoadStart.add(() => this.loadStart());
 		game.load.onFileComplete.add((progress) => this.fileComplete(progress));
@@ -115,7 +121,6 @@ class App
 		game.time.advancedTiming = true;
 		this.chatterEvent = null;
 		this.music = null;
-		this.nextLevel = 'level1';
     }
 
 	//------------------------------------------------------------------------------
@@ -146,7 +151,7 @@ class App
 	{
 		console.log("Game starting");
 
-		level = new Level('level', 'tiles', this.nextLevel);
+		level = new Level('biglevel', 'bigtiles', this.nextLevel);
 
 		this.setScarePoints(0);
 		this.setFriendPoints(0);
@@ -166,6 +171,8 @@ class App
 		this.music = game.add.audio('music', 0.6, true);
 		this.music.play();
 
+		game.camera.follow(player.sprite, Phaser.Camera.FOLLOW_TOPDOWN_TIGHT);
+
 		Utils.trackStat('game', 'start');
 	}
 
@@ -180,9 +187,15 @@ class App
 			this.chatterEvent = null;
 		}
 		level.destroy();
+		level = null;
 		guardGroup.destroy();
+		guardGroup = null;
 		civilianGroup.destroy();
+		civilianGroup = null;
 		plantGroup.destroy();
+		plantGroup = null;
+		player.sprite.destroy();
+		player = null;
 		this.startGame();
 	}
 
@@ -262,8 +275,13 @@ class App
 			return;
 		}
 
+		// Toggle music
 		if (lastKey.keyCode === Phaser.Keyboard.M && this.music)
 			this.music.mute = !this.music.mute;
+
+		// Debug: win level
+		if (lastKey.keyCode === Phaser.Keyboard.L && game.input.keyboard.isDown(Phaser.Keyboard.SHIFT))
+			this.winLevel();
 	}
 
 	//------------------------------------------------------------------------------
@@ -283,6 +301,8 @@ class App
 		this.updateGroup(civilianGroup, false);
 		physics.collide(civilianGroup, civilianGroup);
 		physics.collide(civilianGroup, plantGroup);
+
+		physics.collide(plantGroup, plantGroup);
 
 		level.update();
 	}
@@ -367,6 +387,7 @@ class App
 		{
 			this.isRunning = false;
 			this.isAwaitingRestart = true;
+			player.halt();
 			subheaderText.innerHTML = "Dead!";
 			this.setStatus("Press Enter to restart");
 			Utils.trackStat('game', 'death');
@@ -412,10 +433,9 @@ class App
 		}
 		guardGroup.forEachAlive(findChatterers, null);
 		civilianGroup.forEachAlive(findChatterers, null);
-		if (chatterers.length <= 0)
-			return;
 
-		Utils.getRandomElementFrom(chatterers).triggerChatter();
+		if (chatterers.length > 0)
+			Utils.getRandomElementFrom(chatterers).triggerChatter();
 
 		this.scheduleChatter();		// next event
 	}

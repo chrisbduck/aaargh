@@ -27,9 +27,8 @@ class Level
 
 		this.tilemap = game.add.tilemap(mapName);
 		this.tilemap.addTilesetImage(tilesetName);
-		//this.tilemap.setCollision([TILE_WALL, TILE_PLANT]);
-		this.tilemap.setCollision(TILE_WALL);
 		this.layer = this.tilemap.createLayer(layerName);
+		this.tilemap.setCollision(TILE_WALL, true, this.layer);
 		//this.layer.debug = true;
 
 		// Player
@@ -111,7 +110,7 @@ class Level
 				tile = map.getTile(newX, newY, layer);
 				if (tile && tile.index == TILE_PATH)
 				{
-					map.removeTile(newX, newY);
+					map.removeTile(newX, newY, layer);
 					break;
 				}
 			}
@@ -148,7 +147,7 @@ class Level
 				if (!tile || tile.index !== TILE_PATH)
 					break;
 				
-				map.removeTile(newX, newY);
+				map.removeTile(newX, newY, layer);
 				x = newX;
 				y = newY;
 			}
